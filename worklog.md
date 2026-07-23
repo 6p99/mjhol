@@ -90,3 +90,31 @@ Stage Summary:
 - All API routes return 200 in local dev
 - Agent Browser verified: no errors, all UI elements render correctly
 - Project is ready for Cloudflare Workers deployment with: bun run deploy:cf
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Add visitor protection (one-time registration) and ideas protection (6hr cooldown)
+
+Work Log:
+- Added `Visitor` model to Prisma schema with unique fingerprint field
+- Added `IdeaSubmission` model to Prisma schema for tracking idea submissions per person
+- Pushed schema to local SQLite DB via `bun run db:push`
+- Updated `db/schema.sql` (D1 migration) with new tables and indexes
+- Updated `/api/visitors` GET route: accepts `fp` query param, checks Visitor table for existing fingerprint, only increments counter for new visitors
+- Updated `/api/ideas` POST route: checks IdeaSubmission table for submissions within last 6 hours, rejects with Arabic error message + retry time if cooldown active
+- Added `generateFingerprint()` function to page.tsx — creates stable SHA-256 hash from navigator properties (userAgent, language, screen, timezone, hardwareConcurrency, platform)
+- Updated `useVisitorCount` hook to generate and send fingerprint with visitor API call
+- Updated IdeasView `handleSubmit` to send fingerprint and display proper 429 error with cooldown timer in Arabic
+- Regenerated Prisma client with `bun run db:generate`
+- All changes verified via dev.log:
+  - `/api/visitors?fp=2907befd...` → 200 (new visitor: INSERT + counter increment)
+  - `/api/visitors?fp=ab5e5544...` → 200 (existing visitor: findUnique only, no counter increment)
+  - All other APIs return 200 (github, comments, skills, auth/session)
+- ESLint passes clean
+- Created comprehensive `DEPLOY.md` with full Cloudflare Workers deployment guide in Arabic
+
+Stage Summary:
+- Visitor protection: each unique browser (fingerprint) registers as visitor exactly once
+- Ideas protection: each person can submit one idea per 6-hour window with Arabic error message showing remaining time
+- DEPLOY.md written with step-by-step Cloudflare Workers deployment instructions

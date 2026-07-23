@@ -21,6 +21,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ADMIN_DISCORD_ID = '803662340465229855';
 
+// ==================== Fingerprint ====================
+/** Generate a stable fingerprint for this browser (SHA-256 via Web Crypto) */
+function generateFingerprint(): Promise<string> {
+  const data = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + 'x' + screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || 'na',
+    navigator.platform || 'na',
+  ].join('|');
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(data)).then(buf =>
+    Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  );
+}
+
 // ==================== Types ====================
 interface GithubProfile { login:string; name:string; bio:string; avatarUrl:string; githubUrl:string; publicRepos:number; followers:number; following:number; createdAt:string; }
 interface GithubRepo { name:string; language:string|null; stars:number; forks:number; url:string; description:string|null; color:string|null; }
@@ -45,7 +62,9 @@ function useGithubData() {
 function useVisitorCount() {
   const [count, setCount] = useState(0);
   useEffect(() => {
-    fetch('/api/visitors').then(r=>r.json()).then(d=>setCount(d.count||0)).catch(()=>{});
+    generateFingerprint().then(fp => {
+      fetch(`/api/visitors?fp=${encodeURIComponent(fp)}`).then(r=>r.json()).then(d=>setCount(d.count||0)).catch(()=>{});
+    });
   },[]);
   return count;
 }
@@ -469,9 +488,17 @@ function IdeasView() {
     if(!title.trim()||!content.trim())return;
     setSending(true);setMsg('');
     try{
-      const res=await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content})});
+      const fp = await generateFingerprint();
+      const res=await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content,fingerprint:fp})});
       const d=await res.json();
-      if(!res.ok){setMsg(d.error||'حدث خطأ');return;}
+      if(!res.ok){
+        if(res.status===429 && d.retryAfter){
+          setMsg(`${d.error || 'يمكنك إرسال فكرة كل 6 ساعات'} • حاول بعد ${d.retryAfter}`);
+        } else {
+          setMsg(d.error||'حدث خطأ');
+        }
+        return;
+      }
       setTitle('');setContent('');setMsg('تم إرسال الفكرة بنجاح! بانتظار الموافقة.');fetchIdeas();
     }catch{setMsg('فشل الإرسال');}finally{setSending(false);}
   };
