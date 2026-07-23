@@ -1,0 +1,1033 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback, useRef } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { SessionProvider, useSession } from 'next-auth/react';
+     6→import {
+     7→  Github,
+     8→  ExternalLink,
+     9→  MessageSquare,
+    10→  Send,
+    11→  LogOut,
+    12→  Clock,
+    13→  Star,
+    14→  GitFork,
+    15→  BookOpen,
+    16→  Code2,
+    17→  Terminal,
+    18→  ChevronDown,
+    19→  ChevronUp,
+    20→  Loader2,
+    21→  AlertCircle,
+    22→  User,
+    23→  Trash2,
+    24→  Plus,
+    25→  Server,
+    26→  Users,
+    27→  UserCheck,
+    28→  Link2,
+    29→  X,
+    30→  RefreshCw,
+    31→  ImageIcon,
+    32→  Globe,
+    33→  Hash,
+    34→  BarChart3,
+    35→  Settings,
+    36→  ArrowLeft,
+    37→} from 'lucide-react';
+    38→import { Button } from '@/components/ui/button';
+    39→import { Card, CardContent, CardHeader } from '@/components/ui/card';
+    40→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+    41→import { Badge } from '@/components/ui/badge';
+    42→import { Textarea } from '@/components/ui/textarea';
+    43→import { Skeleton } from '@/components/ui/skeleton';
+    44→import { Input } from '@/components/ui/input';
+    45→import { Separator } from '@/components/ui/separator';
+    46→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    47→import { ScrollArea } from '@/components/ui/scroll-area';
+    48→
+    49→const ADMIN_DISCORD_ID = '803662340465229855';
+    50→
+    51→// ==================== Types ====================
+    52→interface GithubProfile {
+    53→  login: string;
+    54→  name: string;
+    55→  bio: string;
+    56→  avatarUrl: string;
+    57→  githubUrl: string;
+    58→  publicRepos: number;
+    59→  followers: number;
+    60→  following: number;
+    61→  createdAt: string;
+    62→}
+    63→
+    64→interface GithubRepo {
+    65→  name: string;
+    66→  language: string | null;
+    67→  stars: number;
+    68→  forks: number;
+    69→  url: string;
+    70→  description: string | null;
+    71→  color: string | null;
+    72→}
+    73→
+    74→interface Comment {
+    75→  id: string;
+    76→  content: string;
+    77→  username: string;
+    78→  discriminator: string | null;
+    79→  avatar: string | null;
+    80→  createdAt: string;
+    81→}
+    82→
+    83→interface DiscordServerData {
+    84→  id: string;
+    85→  inviteCode: string;
+    86→  serverId: string;
+    87→  name: string;
+    88→  icon: string | null;
+    89→  splash: string | null;
+    90→  banner: string | null;
+    91→  description: string | null;
+    92→  memberCount: number;
+    93→  onlineCount: number;
+    94→  channelId: string | null;
+    95→  channelName: string | null;
+    96→  createdAt: string;
+    97→}
+    98→
+    99→interface AdminStats {
+   100→  totalUsers: number;
+   101→  totalComments: number;
+   102→  totalServers: number;
+   103→  totalRateLimits: number;
+   104→}
+   105→
+   106→// ==================== Hooks ====================
+   107→function useGithubData() {
+   108→  const [profile, setProfile] = useState<GithubProfile | null>(null);
+   109→  const [repos, setRepos] = useState<GithubRepo[]>([]);
+   110→  const [loading, setLoading] = useState(true);
+   111→
+   112→  useEffect(() => {
+   113→    fetch('/api/github')
+   114→      .then((res) => res.json())
+   115→      .then((data) => {
+   116→        setProfile(data.profile);
+   117→        setRepos(data.repos);
+   118→      })
+   119→      .catch(console.error)
+   120→      .finally(() => setLoading(false));
+   121→  }, []);
+   122→
+   123→  return { profile, repos, loading };
+   124→}
+   125→
+   126→// ==================== Discord SVG Icon ====================
+   127→const DiscordIcon = ({ className }: { className?: string }) => (
+   128→  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+   129→    <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286z" />
+   130→  </svg>
+   131→);
+   132→
+   133→// ==================== Main App ====================
+   134→function AppContent() {
+   135→  return (
+   136→    <SessionProvider>
+   137→      <MainApp />
+   138→    </SessionProvider>
+   139→  );
+   140→}
+   141→
+   142→function MainApp() {
+   143→  const [currentView, setCurrentView] = useState<'profile' | 'servers' | 'admin'>('profile');
+   144→  const { data: session, status } = useSession();
+   145→  const isAdmin = status === 'authenticated' && session?.user?.id === ADMIN_DISCORD_ID;
+   146→
+   147→  return (
+   148→    <div className="min-h-screen bg-black text-white flex flex-col">
+   149→      {/* Background */}
+   150→      <div className="fixed inset-0 -z-10 overflow-hidden">
+   151→        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)]" />
+   152→        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,_rgba(255,255,255,0.06)_0%,_transparent_60%)] blur-3xl animate-pulse" />
+   153→        <GridOverlay />
+   154→      </div>
+   155→
+   156→      {/* Header */}
+   157→      <header className="border-b border-white/10 backdrop-blur-md bg-black/50 sticky top-0 z-50">
+   158→        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+   159→          <div className="flex items-center gap-3">
+   160→            <Terminal className="w-5 h-5 text-white/60" />
+   161→            <span className="font-mono text-sm text-white/60">6p99.dev</span>
+   162→            {currentView !== 'profile' && (
+   163→              <Button
+   164→                variant="ghost"
+   165→                size="sm"
+   166→                onClick={() => setCurrentView('profile')}
+   167→                className="text-white/50 hover:text-white hover:bg-white/5 ml-2"
+   168→              >
+   169→                <ArrowLeft className="w-4 h-4 mr-1" />
+   170→                الرئيسية
+   171→              </Button>
+   172→            )}
+   173→          </div>
+   174→          <div className="flex items-center gap-2">
+   175→            {/* Admin nav - only visible to admin */}
+   176→            {isAdmin && (
+   177→              <>
+   178→                <Button
+   179→                  variant="ghost"
+   180→                  size="sm"
+   181→                  onClick={() => setCurrentView('servers')}
+   182→                  className={`text-white/60 hover:text-white hover:bg-white/5 ${currentView === 'servers' ? 'text-white bg-white/10' : ''}`}
+   183→                >
+   184→                  <Server className="w-4 h-4 sm:mr-2" />
+   185→                  <span className="hidden sm:inline">سيرفرات</span>
+   186→                </Button>
+   187→                <Button
+   188→                  variant="ghost"
+   189→                  size="sm"
+   190→                  onClick={() => setCurrentView('admin')}
+   191→                  className={`text-white/60 hover:text-white hover:bg-white/5 ${currentView === 'admin' ? 'text-white bg-white/10' : ''}`}
+   192→                >
+   193→                  <Settings className="w-4 h-4 sm:mr-2" />
+   194→                  <span className="hidden sm:inline">الإدارة</span>
+   195→                </Button>
+   196→              </>
+   197→            )}
+   198→
+   199→            {status === 'authenticated' && session?.user ? (
+   200→              <div className="flex items-center gap-2">
+   201→                <Avatar className="w-8 h-8 border border-white/20">
+   202→                  <AvatarImage src={session.user.image || undefined} />
+   203→                  <AvatarFallback className="bg-white/10 text-white text-xs">
+   204→                    <User className="w-3 h-3" />
+   205→                  </AvatarFallback>
+   206→                </Avatar>
+   207→                <span className="text-sm text-white/80 hidden sm:inline">
+   208→                  {session.user.name || 'User'}
+   209→                </span>
+   210→                <Button
+   211→                  variant="ghost"
+   212→                  size="sm"
+   213→                  onClick={() => {
+   214→                    window.location.href = '/api/auth/signout?callbackUrl=/';
+   215→                  }}
+   216→                  className="text-white/60 hover:text-white hover:bg-white/5"
+   217→                >
+   218→                  <LogOut className="w-4 h-4" />
+   219→                </Button>
+   220→              </div>
+   221→            ) : (
+   222→              <Button
+   223→                onClick={() => {
+   224→                  window.location.href = `/api/auth/signin/discord?callbackUrl=${encodeURIComponent('/')}`;
+   225→                }}
+   226→                size="sm"
+   227→                className="bg-white text-black hover:bg-white/90 font-medium"
+   228→              >
+   229→                <DiscordIcon className="w-4 h-4 mr-2" />
+   230→                <span className="hidden sm:inline">دخول ديسكورد</span>
+   231→              </Button>
+   232→            )}
+   233→          </div>
+   234→        </div>
+   235→      </header>
+   236→
+   237→      {/* Content */}
+   238→      <main className="flex-1">
+   239→        {currentView === 'profile' && <ProfileView />}
+   240→        {currentView === 'servers' && isAdmin && <ServersView />}
+   241→        {currentView === 'admin' && isAdmin && <AdminView />}
+   242→      </main>
+   243→
+   244→      {/* Footer */}
+   245→      <footer className="border-t border-white/10 bg-black/50 backdrop-blur-md mt-auto">
+   246→        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+   247→          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+   248→            <div className="flex items-center gap-2 text-white/30 text-sm">
+   249→              <Terminal className="w-4 h-4" />
+   250→              <span>© {new Date().getFullYear()} MJHOL — 6p99</span>
+   251→            </div>
+   252→          </div>
+   253→        </div>
+   254→      </footer>
+   255→    </div>
+   256→  );
+   257→}
+   258→
+   259→// ==================== Profile View ====================
+   260→function ProfileView() {
+   261→  const { data: session, status } = useSession();
+   262→  const { profile, repos, loading } = useGithubData();
+   263→  const [comments, setComments] = useState<Comment[]>([]);
+   264→  const [newComment, setNewComment] = useState('');
+   265→  const [sending, setSending] = useState(false);
+   266→  const [error, setError] = useState('');
+   267→  const [cooldownInfo, setCooldownInfo] = useState<{ active: boolean; remaining: string } | null>(null);
+   268→  const [reposExpanded, setReposExpanded] = useState(false);
+   269→
+   270→  const fetchComments = useCallback(() => {
+   271→    fetch('/api/comments')
+   272→      .then((res) => res.json())
+   273→      .then((data) => setComments(data.comments || []))
+   274→      .catch(console.error);
+   275→  }, []);
+   276→
+   277→  useEffect(() => {
+   278→    fetchComments();
+   279→    const interval = setInterval(fetchComments, 30000);
+   280→    return () => clearInterval(interval);
+   281→  }, [fetchComments]);
+   282→
+   283→  const handleSubmitComment = async () => {
+   284→    if (!newComment.trim()) return;
+   285→    setSending(true);
+   286→    setError('');
+   287→    try {
+   288→      const res = await fetch('/api/comments', {
+   289→        method: 'POST',
+   290→        headers: { 'Content-Type': 'application/json' },
+   291→        body: JSON.stringify({ content: newComment }),
+   292→      });
+   293→      const data = await res.json();
+   294→      if (!res.ok) {
+   295→        if (res.status === 401) setError('يجب تسجيل الدخول عبر ديسكورد أولاً للتعليق');
+   296→        else if (res.status === 429) {
+   297→          if (data.cooldownRemaining) {
+   298→            const hours = Math.floor(data.cooldownRemaining / 3600000);
+   299→            const minutes = Math.floor((data.cooldownRemaining % 3600000) / 60000);
+   300→            setCooldownInfo({ active: true, remaining: `${hours}س ${minutes}د` });
+   301→          }
+   302→          setError(data.error || 'تم تقييد الطلبات، حاول لاحقاً');
+   303→        } else setError(data.error || 'حدث خطأ');
+   304→        return;
+   305→      }
+   306→      setNewComment('');
+   307→      setError('');
+   308→      setCooldownInfo(null);
+   309→      fetchComments();
+   310→    } catch {
+   311→      setError('فشل إرسال التعليق');
+   312→    } finally {
+   313→      setSending(false);
+   314→    }
+   315→  };
+   316→
+   317→  const signInDiscord = () => {
+   318→    window.location.href = `/api/auth/signin/discord?callbackUrl=${encodeURIComponent('/')}`;
+   319→  };
+   320→
+   321→  const timeAgo = (dateStr: string) => {
+   322→    const diff = Date.now() - new Date(dateStr).getTime();
+   323→    const minutes = Math.floor(diff / 60000);
+   324→    const hours = Math.floor(diff / 3600000);
+   325→    const days = Math.floor(diff / 86400000);
+   326→    if (minutes < 1) return 'الآن';
+   327→    if (minutes < 60) return `منذ ${minutes} دقيقة`;
+   328→    if (hours < 24) return `منذ ${hours} ساعة`;
+   329→    return `منذ ${days} يوم`;
+   330→  };
+   331→
+   332→  const displayRepos = reposExpanded ? repos : repos.slice(0, 6);
+   333→
+   334→  return (
+   335→    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+   336→      {/* Hero */}
+   337→      <section className="flex flex-col items-center text-center mb-20">
+   338→        <motion.div
+   339→          initial={{ opacity: 0, scale: 0.8 }}
+   340→          animate={{ opacity: 1, scale: 1 }}
+   341→          transition={{ duration: 0.6, ease: 'easeOut' }}
+   342→          className="relative mb-8"
+   343→        >
+   344→          <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-2 border-white/20 shadow-2xl shadow-white/5">
+   345→            {loading ? (
+   346→              <Skeleton className="w-full h-full bg-white/10" />
+   347→            ) : (
+   348→              <img
+   349→                src={profile?.avatarUrl || '/placeholder.png'}
+   350→                alt={profile?.name || '6p99'}
+   351→                className="w-full h-full object-cover"
+   352→              />
+   353→            )}
+   354→          </div>
+   355→          <motion.div
+   356→            className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-green-500 border-4 border-black flex items-center justify-center"
+   357→            initial={{ scale: 0 }}
+   358→            animate={{ scale: 1 }}
+   359→            transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
+   360→          >
+   361→            <span className="text-[10px]">●</span>
+   362→          </motion.div>
+   363→        </motion.div>
+   364→
+   365→        <motion.h1
+   366→          initial={{ opacity: 0, y: 20 }}
+   367→          animate={{ opacity: 1, y: 0 }}
+   368→          transition={{ delay: 0.2, duration: 0.5 }}
+   369→          className="text-4xl sm:text-6xl font-bold tracking-tight mb-3"
+   370→        >
+   371→          {loading ? <Skeleton className="h-12 w-48 mx-auto bg-white/10" /> : profile?.name || 'MJHOL'}
+   372→        </motion.h1>
+   373→
+   374→        <motion.p
+   375→          initial={{ opacity: 0, y: 20 }}
+   376→          animate={{ opacity: 1, y: 0 }}
+   377→          transition={{ delay: 0.3, duration: 0.5 }}
+   378→          className="text-base sm:text-lg text-white/50 max-w-2xl mb-2 font-mono"
+   379→        >
+   380→          @6p99
+   381→        </motion.p>
+   382→
+   383→        <motion.p
+   384→          initial={{ opacity: 0, y: 20 }}
+   385→          animate={{ opacity: 1, y: 0 }}
+   386→          transition={{ delay: 0.4, duration: 0.5 }}
+   387→          className="text-white/40 max-w-xl mb-8 text-sm sm:text-base leading-relaxed"
+   388→        >
+   389→          {loading
+   390→            ? 'Loading...'
+   391→            : profile?.bio || 'I am curious about everything; I try to understand and program everything—the possible and the impossible.'}
+   392→        </motion.p>
+   393→
+   394→        <motion.div
+   395→          initial={{ opacity: 0, y: 20 }}
+   396→          animate={{ opacity: 1, y: 0 }}
+   397→          transition={{ delay: 0.5, duration: 0.5 }}
+   398→          className="flex items-center gap-6 sm:gap-8 mb-8"
+   399→        >
+   400→          <StatBadge icon={<BookOpen className="w-4 h-4" />} value={profile?.publicRepos || 10} label="مستودعات" />
+   401→          <StatBadge icon={<Star className="w-4 h-4" />} value={profile?.followers || 0} label="متابعين" />
+   402→          <StatBadge icon={<Github className="w-4 h-4" />} value={profile?.following || 4} label="يتابع" />
+   403→        </motion.div>
+   404→
+   405→        <motion.div
+   406→          initial={{ opacity: 0, y: 20 }}
+   407→          animate={{ opacity: 1, y: 0 }}
+   408→          transition={{ delay: 0.6, duration: 0.5 }}
+   409→          className="flex items-center gap-4"
+   410→        >
+   411→          <a
+   412→            href="https://github.com/6p99"
+   413→            target="_blank"
+   414→            rel="noopener noreferrer"
+   415→            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-all"
+   416→          >
+   417→            <Github className="w-5 h-5" />
+   418→            GitHub
+   419→          </a>
+   420→        </motion.div>
+   421→      </section>
+   422→
+   423→      {/* Repositories */}
+   424→      <section className="mb-20">
+   425→        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+   426→          <div className="flex items-center justify-between mb-8">
+   427→            <div>
+   428→              <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+   429→                <Code2 className="w-7 h-7 text-white/40" />
+   430→                المستودعات
+   431→              </h2>
+   432→              <p className="text-white/40 text-sm mt-1">أحدث المشاريع والمستودعات</p>
+   433→            </div>
+   434→            {repos.length > 6 && (
+   435→              <Button variant="ghost" size="sm" onClick={() => setReposExpanded(!reposExpanded)} className="text-white/60 hover:text-white hover:bg-white/5">
+   436→                {reposExpanded ? (<><ChevronUp className="w-4 h-4 mr-1" />عرض أقل</>) : (<><ChevronDown className="w-4 h-4 mr-1" />عرض الكل ({repos.length})</>)}
+   437→              </Button>
+   438→            )}
+   439→          </div>
+   440→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   441→            {loading
+   442→              ? Array.from({ length: 6 }).map((_, i) => (
+   443→                  <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-5 w-32 bg-white/10 mb-3" /><Skeleton className="h-4 w-full bg-white/10 mb-2" /><Skeleton className="h-4 w-24 bg-white/10" /></CardContent></Card>
+   444→                ))
+   445→              : displayRepos.map((repo, i) => (
+   446→                  <motion.div key={repo.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05, duration: 0.4 }}>
+   447→                    <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300 group cursor-pointer h-full">
+   448→                      <CardContent className="p-5">
+   449→                        <div className="flex items-start justify-between mb-3">
+   450→                          <div className="flex items-center gap-2 min-w-0">
+   451→                            <BookOpen className="w-4 h-4 text-white/30 flex-shrink-0" />
+   452→                            <h3 className="font-semibold text-sm truncate group-hover:text-white/90">{repo.name}</h3>
+   453→                          </div>
+   454→                          <a href={repo.url} target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white/80 transition-colors flex-shrink-0 ml-2">
+   455→                            <ExternalLink className="w-3.5 h-3.5" />
+   456→                          </a>
+   457→                        </div>
+   458→                        {repo.description && <p className="text-xs text-white/40 mb-3 line-clamp-2 leading-relaxed">{repo.description}</p>}
+   459→                        <div className="flex items-center gap-3 mt-auto">
+   460→                          {repo.language && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: repo.color || '#8b8b8b' }} /><span className="text-xs text-white/50">{repo.language}</span></div>}
+   461→                          {repo.stars > 0 && <div className="flex items-center gap-1 text-white/40"><Star className="w-3 h-3" /><span className="text-xs">{repo.stars}</span></div>}
+   462→                          {repo.forks > 0 && <div className="flex items-center gap-1 text-white/40"><GitFork className="w-3 h-3" /><span className="text-xs">{repo.forks}</span></div>}
+   463→                        </div>
+   464→                      </CardContent>
+   465→                    </Card>
+   466→                  </motion.div>
+   467→                ))}
+   468→          </div>
+   469→        </motion.div>
+   470→      </section>
+   471→
+   472→      {/* Comments */}
+   473→      <section className="mb-20">
+   474→        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+   475→          <div className="flex items-center justify-between mb-8">
+   476→            <div>
+   477→              <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+   478→                <MessageSquare className="w-7 h-7 text-white/40" />
+   479→                التعليقات
+   480→              </h2>
+   481→              <p className="text-white/40 text-sm mt-1">شاركنا رأيك • يمكنك التعليق كل 6 ساعات</p>
+   482→            </div>
+   483→            <Badge variant="secondary" className="bg-white/10 text-white/60 border-white/10">{comments.length} تعليق</Badge>
+   484→          </div>
+   485→
+   486→          <Card className="bg-white/[0.03] border-white/10 mb-6">
+   487→            <CardContent className="p-5">
+   488→              {status === 'authenticated' ? (
+   489→                <div className="space-y-3">
+   490→                  <div className="flex items-center gap-2 mb-2">
+   491→                    <Avatar className="w-6 h-6 border border-white/20">
+   492→                      <AvatarImage src={session?.user?.image || undefined} />
+   493→                      <AvatarFallback className="bg-white/10 text-white text-[10px]"><User className="w-3 h-3" /></AvatarFallback>
+   494→                    </Avatar>
+   495→                    <span className="text-xs text-white/50">معلّق كـ {session?.user?.name || 'User'}</span>
+   496→                  </div>
+   497→                  <Textarea
+   498→                    value={newComment}
+   499→                    onChange={(e) => setNewComment(e.target.value)}
+   500→                    placeholder="اكتب تعليقك هنا..."
+   501→                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none min-h-[80px] focus:border-white/30 focus:ring-white/20"
+   502→                    maxLength={500}
+   503→                  />
+   504→                  <div className="flex items-center justify-between">
+   505→                    <div className="flex items-center gap-2">
+   506→                      {cooldownInfo?.active && (
+   507→                        <div className="flex items-center gap-1 text-xs text-yellow-500/80"><Clock className="w-3 h-3" /><span>يمكنك التعليق بعد {cooldownInfo.remaining}</span></div>
+   508→                      )}
+   509→                      <span className="text-xs text-white/30">{newComment.length}/500</span>
+   510→                    </div>
+   511→                    <Button onClick={handleSubmitComment} disabled={sending || !newComment.trim()} size="sm" className="bg-white text-black hover:bg-white/90 font-medium">
+   512→                      {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+   513→                      إرسال
+   514→                    </Button>
+   515→                  </div>
+   516→                  {error && <div className="flex items-center gap-2 text-xs text-red-400"><AlertCircle className="w-3 h-3" /><span>{error}</span></div>}
+   517→                </div>
+   518→              ) : (
+   519→                <div className="text-center py-6">
+   520→                  <p className="text-white/40 text-sm mb-4">سجّل دخولك عبر ديسكورد لتتمكن من التعليق</p>
+   521→                  <Button onClick={signInDiscord} className="bg-white text-black hover:bg-white/90 font-medium">
+   522→                    <DiscordIcon className="w-4 h-4 mr-2" />
+   523→                    تسجيل الدخول عبر ديسكورد
+   524→                  </Button>
+   525→                </div>
+   526→              )}
+   527→            </CardContent>
+   528→          </Card>
+   529→
+   530→          <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+   531→            <AnimatePresence mode="popLayout">
+   532→              {comments.length === 0 ? (
+   533→                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+   534→                  <MessageSquare className="w-10 h-10 text-white/10 mx-auto mb-3" />
+   535→                  <p className="text-white/30 text-sm">لا توجد تعليقات بعد. كن أول من يعلّق!</p>
+   536→                </motion.div>
+   537→              ) : (
+   538→                comments.map((comment, i) => (
+   539→                  <motion.div key={comment.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.03, duration: 0.3 }}>
+   540→                    <Card className="bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+   541→                      <CardContent className="p-4">
+   542→                        <div className="flex items-start gap-3">
+   543→                          <Avatar className="w-8 h-8 border border-white/10 flex-shrink-0">
+   544→                            <AvatarImage src={comment.avatar || undefined} />
+   545→                            <AvatarFallback className="bg-white/10 text-white text-xs">{comment.username.charAt(0).toUpperCase()}</AvatarFallback>
+   546→                          </Avatar>
+   547→                          <div className="flex-1 min-w-0">
+   548→                            <div className="flex items-center gap-2 mb-1">
+   549→                              <span className="text-sm font-medium text-white/80">{comment.username}{comment.discriminator && comment.discriminator !== '0' && <span className="text-white/30">#{comment.discriminator}</span>}</span>
+   550→                              <span className="text-[11px] text-white/25">{timeAgo(comment.createdAt)}</span>
+   551→                            </div>
+   552→                            <p className="text-sm text-white/60 leading-relaxed break-words">{comment.content}</p>
+   553→                          </div>
+   554→                        </div>
+   555→                      </CardContent>
+   556→                    </Card>
+   557→                  </motion.div>
+   558→                ))
+   559→              )}
+   560→            </AnimatePresence>
+   561→          </div>
+   562→        </motion.div>
+   563→      </section>
+   564→    </div>
+   565→  );
+   566→}
+   567→
+   568→// ==================== Servers View (Admin Only) ====================
+   569→function ServersView() {
+   570→  const [servers, setServers] = useState<DiscordServerData[]>([]);
+   571→  const [inviteUrl, setInviteUrl] = useState('');
+   572→  const [adding, setAdding] = useState(false);
+   573→  const [addError, setAddError] = useState('');
+   574→  const [loading, setLoading] = useState(true);
+   575→
+   576→  const fetchServers = useCallback(() => {
+   577→    fetch('/api/servers')
+   578→      .then((res) => res.json())
+   579→      .then((data) => setServers(data.servers || []))
+   580→      .catch(console.error)
+   581→      .finally(() => setLoading(false));
+   582→  }, []);
+   583→
+   584→  useEffect(() => {
+   585→    fetchServers();
+   586→  }, [fetchServers]);
+   587→
+   588→  const handleAddServer = async () => {
+   589→    if (!inviteUrl.trim()) return;
+   590→    setAdding(true);
+   591→    setAddError('');
+   592→    try {
+   593→      const res = await fetch('/api/servers', {
+   594→        method: 'POST',
+   595→        headers: { 'Content-Type': 'application/json' },
+   596→        body: JSON.stringify({ inviteUrl: inviteUrl.trim() }),
+   597→      });
+   598→      const data = await res.json();
+   599→      if (!res.ok) {
+   600→        setAddError(data.error || 'فشل إضافة السيرفر');
+   601→        return;
+   602→      }
+   603→      setInviteUrl('');
+   604→      fetchServers();
+   605→    } catch {
+   606→      setAddError('فشل الاتصال بالخادم');
+   607→    } finally {
+   608→      setAdding(false);
+   609→    }
+   610→  };
+   611→
+   612→  const handleDeleteServer = async (serverId: string) => {
+   613→    try {
+   614→      await fetch('/api/servers', {
+   615→        method: 'DELETE',
+   616→        headers: { 'Content-Type': 'application/json' },
+   617→        body: JSON.stringify({ serverId }),
+   618→      });
+   619→      fetchServers();
+   620→    } catch {
+   621→      // silent
+   622→    }
+   623→  };
+   624→
+   625→  const getServerIcon = (server: DiscordServerData) => {
+   626→    if (server.icon) {
+   627→      return `https://cdn.discordapp.com/icons/${server.serverId}/${server.icon}.png`;
+   628→    }
+   629→    return null;
+   630→  };
+   631→
+   632→  const getServerBanner = (server: DiscordServerData) => {
+   633→    if (server.banner) {
+   634→      return `https://cdn.discordapp.com/banners/${server.serverId}/${server.banner}.png`;
+   635→    }
+   636→    return null;
+   637→  };
+   638→
+   639→  return (
+   640→    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+   641→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+   642→        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
+   643→          <div>
+   644→            <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+   645→              <Server className="w-8 h-8 text-white/40" />
+   646→              سيرفرات ديسكورد
+   647→            </h1>
+   648→            <p className="text-white/40 text-sm mt-2">إدارة السيرفرات عبر روابط الدعوة</p>
+   649→          </div>
+   650→          <Badge variant="secondary" className="bg-white/10 text-white/60 border-white/10">{servers.length} سيرفر</Badge>
+   651→        </div>
+   652→
+   653→        {/* Add Server */}
+   654→        <Card className="bg-white/[0.03] border-white/10 mb-8">
+   655→          <CardContent className="p-5">
+   656→            <div className="flex flex-col sm:flex-row gap-3">
+   657→              <div className="flex-1 relative">
+   658→                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+   659→                <Input
+   660→                  value={inviteUrl}
+   661→                  onChange={(e) => setInviteUrl(e.target.value)}
+   662→                  placeholder="discord.gg/..."
+   663→                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 pl-9"
+   664→                  onKeyDown={(e) => e.key === 'Enter' && handleAddServer()}
+   665→                />
+   666→              </div>
+   667→              <Button onClick={handleAddServer} disabled={adding || !inviteUrl.trim()} size="default" className="bg-white text-black hover:bg-white/90 font-medium w-full sm:w-auto">
+   668→                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+   669→                إضافة سيرفر
+   670→              </Button>
+   671→            </div>
+   672→            {addError && <div className="flex items-center gap-2 text-xs text-red-400 mt-2"><AlertCircle className="w-3 h-3" /><span>{addError}</span></div>}
+   673→          </CardContent>
+   674→        </Card>
+   675→
+   676→        {/* Servers Grid */}
+   677→        {loading ? (
+   678→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   679→            {Array.from({ length: 3 }).map((_, i) => (
+   680→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-20 w-20 mx-auto rounded-xl bg-white/10 mb-4" /><Skeleton className="h-5 w-32 mx-auto bg-white/10 mb-2" /><Skeleton className="h-4 w-24 mx-auto bg-white/10" /></CardContent></Card>
+   681→            ))}
+   682→          </div>
+   683→        ) : servers.length === 0 ? (
+   684→          <div className="text-center py-20">
+   685→            <Server className="w-16 h-16 text-white/10 mx-auto mb-4" />
+   686→            <p className="text-white/30">لا توجد سيرفرات بعد. أضف سيرفر باستخدام رابط الدعوة!</p>
+   687→          </div>
+   688→        ) : (
+   689→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   690→            <AnimatePresence>
+   691→              {servers.map((server, i) => {
+   692→                const iconUrl = getServerIcon(server);
+   693→                const bannerUrl = getServerBanner(server);
+   694→                return (
+   695→                  <motion.div
+   696→                    key={server.id}
+   697→                    initial={{ opacity: 0, y: 20 }}
+   698→                    animate={{ opacity: 1, y: 0 }}
+   699→                    exit={{ opacity: 0, scale: 0.9 }}
+   700→                    transition={{ delay: i * 0.05, duration: 0.4 }}
+   701→                    layout
+   702→                  >
+   703→                    <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300 overflow-hidden group relative">
+   704→                      {/* Banner */}
+   705→                      {bannerUrl && (
+   706→                        <div className="w-full h-24 relative overflow-hidden">
+   707→                          <img src={bannerUrl} alt="" className="w-full h-full object-cover" />
+   708→                          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80" />
+   709→                        </div>
+   710→                      )}
+   711→                      <CardContent className="p-5 relative">
+   712→                        {/* Delete button */}
+   713→                        <Button
+   714→                          variant="ghost"
+   715→                          size="sm"
+   716→                          onClick={() => handleDeleteServer(server.id)}
+   717→                          className="absolute top-3 right-3 text-white/20 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 p-0"
+   718→                        >
+   719→                          <Trash2 className="w-3.5 h-3.5" />
+   720→                        </Button>
+   721→
+   722→                        {/* Icon */}
+   723→                        <div className="flex flex-col items-center text-center">
+   724→                          <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 mb-3 bg-white/5 -mt-6 relative z-10 shadow-lg">
+   725→                            {iconUrl ? (
+   726→                              <img src={iconUrl} alt={server.name} className="w-full h-full object-cover" />
+   727→                            ) : (
+   728→                              <div className="w-full h-full flex items-center justify-center">
+   729→                                <Server className="w-8 h-8 text-white/30" />
+   730→                              </div>
+   731→                            )}
+   732→                          </div>
+   733→                          <h3 className="font-bold text-sm text-white/90 mb-2">{server.name}</h3>
+   734→
+   735→                          {server.description && (
+   736→                            <p className="text-[11px] text-white/40 mb-3 line-clamp-2 leading-relaxed">{server.description}</p>
+   737→                          )}
+   738→
+   739→                          {/* Stats */}
+   740→                          <div className="w-full grid grid-cols-2 gap-2 mt-auto">
+   741→                            <div className="flex items-center gap-1.5 justify-center p-2 rounded-lg bg-white/[0.03]">
+   742→                              <Users className="w-3.5 h-3.5 text-white/40" />
+   743→                              <span className="text-xs text-white/60">{server.memberCount.toLocaleString()}</span>
+   744→                            </div>
+   745→                            <div className="flex items-center gap-1.5 justify-center p-2 rounded-lg bg-white/[0.03]">
+   746→                              <UserCheck className="w-3.5 h-3.5 text-green-400/60" />
+   747→                              <span className="text-xs text-white/60">{server.onlineCount.toLocaleString()}</span>
+   748→                            </div>
+   749→                          </div>
+   750→
+   751→                          {/* Channel info */}
+   752→                          {server.channelName && (
+   753→                            <div className="flex items-center gap-1.5 mt-2 text-white/30">
+   754→                              <Hash className="w-3 h-3" />
+   755→                              <span className="text-[11px]">#{server.channelName}</span>
+   756→                            </div>
+   757→                          )}
+   758→                        </div>
+   759→                      </CardContent>
+   760→                    </Card>
+   761→                  </motion.div>
+   762→                );
+   763→              })}
+   764→            </AnimatePresence>
+   765→          </div>
+   766→        )}
+   767→      </motion.div>
+   768→    </div>
+   769→  );
+   770→}
+   771→
+   772→// ==================== Admin View (Admin Only) ====================
+   773→function AdminView() {
+   774→  const [stats, setStats] = useState<AdminStats | null>(null);
+   775→  const [users, setUsers] = useState<any[]>([]);
+   776→  const [comments, setComments] = useState<any[]>([]);
+   777→  const [servers, setServers] = useState<DiscordServerData[]>([]);
+   778→  const [loading, setLoading] = useState(true);
+   779→  const [activeTab, setActiveTab] = useState('overview');
+   780→
+   781→  const fetchAdminData = useCallback(() => {
+   782→    setLoading(true);
+   783→    fetch('/api/admin')
+   784→      .then((res) => res.json())
+   785→      .then((data) => {
+   786→        setStats(data.stats);
+   787→        setUsers(data.users || []);
+   788→        setComments(data.comments || []);
+   789→        setServers(data.servers || []);
+   790→      })
+   791→      .catch(console.error)
+   792→      .finally(() => setLoading(false));
+   793→  }, []);
+   794→
+   795→  useEffect(() => {
+   796→    fetchAdminData();
+   797→  }, [fetchAdminData]);
+   798→
+   799→  const handleDelete = async (type: string, id: string) => {
+   800→    await fetch('/api/admin', {
+   801→      method: 'DELETE',
+   802→      headers: { 'Content-Type': 'application/json' },
+   803→      body: JSON.stringify({ type, id }),
+   804→    });
+   805→    fetchAdminData();
+   806→  };
+   807→
+   808→  const timeAgo = (dateStr: string) => {
+   809→    const diff = Date.now() - new Date(dateStr).getTime();
+   810→    const minutes = Math.floor(diff / 60000);
+   811→    const hours = Math.floor(diff / 3600000);
+   812→    const days = Math.floor(diff / 86400000);
+   813→    if (minutes < 1) return 'الآن';
+   814→    if (minutes < 60) return `${minutes}د`;
+   815→    if (hours < 24) return `${hours}س`;
+   816→    return `${days}ي`;
+   817→  };
+   818→
+   819→  return (
+   820→    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+   821→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+   822→        <div className="flex items-center justify-between mb-10">
+   823→          <div>
+   824→            <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+   825→              <Settings className="w-8 h-8 text-white/40" />
+   826→              لوحة الإدارة
+   827→            </h1>
+   828→            <p className="text-white/40 text-sm mt-2">إدارة كاملة للموقع</p>
+   829→          </div>
+   830→          <Button variant="ghost" size="sm" onClick={fetchAdminData} className="text-white/50 hover:text-white hover:bg-white/5">
+   831→            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+   832→          </Button>
+   833→        </div>
+   834→
+   835→        {loading ? (
+   836→          <div className="space-y-4">
+   837→            {Array.from({ length: 4 }).map((_, i) => (
+   838→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-20 bg-white/10" /></CardContent></Card>
+   839→            ))}
+   840→          </div>
+   841→        ) : (
+   842→          <>
+   843→            {/* Stats */}
+   844→            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+   845→              <StatCard icon={<Users className="w-5 h-5" />} label="المستخدمين" value={stats?.totalUsers || 0} />
+   846→              <StatCard icon={<MessageSquare className="w-5 h-5" />} label="التعليقات" value={stats?.totalComments || 0} />
+   847→              <StatCard icon={<Server className="w-5 h-5" />} label="السيرفرات" value={stats?.totalServers || 0} />
+   848→              <StatCard icon={<BarChart3 className="w-5 h-5" />} label="تقييدات" value={stats?.totalRateLimits || 0} />
+   849→            </div>
+   850→
+   851→            {/* Tabs */}
+   852→            <Tabs value={activeTab} onValueChange={setActiveTab}>
+   853→              <TabsList className="bg-white/5 border border-white/10 mb-6">
+   854→                <TabsTrigger value="overview" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+   855→                  نظرة عامة
+   856→                </TabsTrigger>
+   857→                <TabsTrigger value="users" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+   858→                  المستخدمين
+   859→                </TabsTrigger>
+   860→                <TabsTrigger value="comments" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+   861→                  التعليقات
+   862→                </TabsTrigger>
+   863→                <TabsTrigger value="servers" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+   864→                  السيرفرات
+   865→                </TabsTrigger>
+   866→              </TabsList>
+   867→
+   868→              <TabsContent value="overview">
+   869→                <div className="space-y-4">
+   870→                  {/* Recent Users */}
+   871→                  <Card className="bg-white/[0.03] border-white/10">
+   872→                    <CardHeader className="pb-2"><h3 className="text-sm font-semibold text-white/70">آخر المستخدمين</h3></CardHeader>
+   873→                    <CardContent>
+   874→                      <div className="space-y-2">
+   875→                        {users.slice(0, 5).map((u) => (
+   876→                          <div key={u.id} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
+   877→                            <div className="flex items-center gap-2">
+   878→                              <Avatar className="w-7 h-7"><AvatarImage src={u.avatar ? `https://cdn.discordapp.com/avatars/${u.discordId}/${u.avatar}.png` : undefined} /><AvatarFallback className="bg-white/10 text-white text-[10px]"><User className="w-3 h-3" /></AvatarFallback></Avatar>
+   879→                              <div>
+   880→                                <span className="text-sm text-white/80">{u.username}</span>
+   881→                                <span className="text-[10px] text-white/30 ml-1">{timeAgo(u.createdAt)}</span>
+   882→                              </div>
+   883→                            </div>
+   884→                            <span className="text-[10px] text-white/30">{u._count?.comments || 0} تعليق</span>
+   885→                          </div>
+   886→                        ))}
+   887→                      </div>
+   888→                    </CardContent>
+   889→                  </Card>
+   890→
+   891→                  {/* Recent Comments */}
+   892→                  <Card className="bg-white/[0.03] border-white/10">
+   893→                    <CardHeader className="pb-2"><h3 className="text-sm font-semibold text-white/70">آخر التعليقات</h3></CardHeader>
+   894→                    <CardContent>
+   895→                      <div className="space-y-2">
+   896→                        {comments.slice(0, 5).map((c) => (
+   897→                          <div key={c.id} className="flex items-start justify-between gap-3 p-2 rounded-lg bg-white/[0.02]">
+   898→                            <div className="min-w-0 flex-1">
+   899→                              <div className="flex items-center gap-2 mb-1">
+   900→                                <span className="text-xs font-medium text-white/70">{c.user?.username}</span>
+   901→                                <span className="text-[10px] text-white/30">{timeAgo(c.createdAt)}</span>
+   902→                              </div>
+   903→                              <p className="text-xs text-white/50 truncate">{c.content}</p>
+   904→                            </div>
+   905→                            <Button variant="ghost" size="sm" onClick={() => handleDelete('comment', c.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 flex-shrink-0 w-7 h-7 p-0">
+   906→                              <Trash2 className="w-3 h-3" />
+   907→                            </Button>
+   908→                          </div>
+   909→                        ))}
+   910→                      </div>
+   911→                    </CardContent>
+   912→                  </Card>
+   913→                </div>
+   914→              </TabsContent>
+   915→
+   916→              <TabsContent value="users">
+   917→                <div className="space-y-2">
+   918→                  {users.map((u) => (
+   919→                    <Card key={u.id} className="bg-white/[0.03] border-white/10">
+   920→                      <CardContent className="p-4 flex items-center justify-between">
+   921→                        <div className="flex items-center gap-3">
+   922→                          <Avatar className="w-8 h-8"><AvatarImage src={u.avatar ? `https://cdn.discordapp.com/avatars/${u.discordId}/${u.avatar}.png` : undefined} /><AvatarFallback className="bg-white/10 text-white text-xs"><User className="w-3 h-3" /></AvatarFallback></Avatar>
+   923→                          <div>
+   924→                            <div className="text-sm text-white/80">{u.username}</div>
+   925→                            <div className="text-[10px] text-white/30">ID: {u.discordId} • {timeAgo(u.createdAt)}</div>
+   926→                          </div>
+   927→                        </div>
+   928→                        <div className="flex items-center gap-2">
+   929→                          <Badge variant="secondary" className="bg-white/5 text-white/40 border-white/10">{u._count?.comments || 0} تعليق</Badge>
+   930→                          <Button variant="ghost" size="sm" onClick={() => handleDelete('user', u.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 w-8 h-8 p-0"><Trash2 className="w-3.5 h-3.5" /></Button>
+   931→                        </div>
+   932→                      </CardContent>
+   933→                    </Card>
+   934→                  ))}
+   935→                  {users.length === 0 && <p className="text-white/30 text-center py-12">لا يوجد مستخدمين بعد</p>}
+   936→                </div>
+   937→              </TabsContent>
+   938→
+   939→              <TabsContent value="comments">
+   940→                <div className="space-y-2">
+   941→                  {comments.map((c) => (
+   942→                    <Card key={c.id} className="bg-white/[0.03] border-white/10">
+   943→                      <CardContent className="p-4">
+   944→                        <div className="flex items-start justify-between gap-3">
+   945→                          <div className="min-w-0 flex-1">
+   946→                            <div className="flex items-center gap-2 mb-1">
+   947→                              <Avatar className="w-6 h-6"><AvatarImage src={c.user?.avatar ? `https://cdn.discordapp.com/avatars/${c.user?.discordId}/${c.user.avatar}.png` : undefined} /><AvatarFallback className="bg-white/10 text-white text-[10px]"><User className="w-2.5 h-2.5" /></AvatarFallback></Avatar>
+   948→                              <span className="text-xs font-medium text-white/70">{c.user?.username}</span>
+   949→                              <span className="text-[10px] text-white/30">{timeAgo(c.createdAt)}</span>
+   950→                            </div>
+   951→                            <p className="text-sm text-white/50 leading-relaxed">{c.content}</p>
+   952→                          </div>
+   953→                          <Button variant="ghost" size="sm" onClick={() => handleDelete('comment', c.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 flex-shrink-0 w-8 h-8 p-0"><Trash2 className="w-3.5 h-3.5" /></Button>
+   954→                        </div>
+   955→                      </CardContent>
+   956→                    </Card>
+   957→                  ))}
+   958→                  {comments.length === 0 && <p className="text-white/30 text-center py-12">لا يوجد تعليقات بعد</p>}
+   959→                </div>
+   960→              </TabsContent>
+   961→
+   962→              <TabsContent value="servers">
+   963→                <div className="space-y-2">
+   964→                  {servers.map((s) => {
+   965→                    const iconUrl = s.icon ? `https://cdn.discordapp.com/icons/${s.serverId}/${s.icon}.png` : null;
+   966→                    return (
+   967→                      <Card key={s.id} className="bg-white/[0.03] border-white/10">
+   968→                        <CardContent className="p-4 flex items-center justify-between">
+   969→                          <div className="flex items-center gap-3">
+   970→                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+   971→                              {iconUrl ? <img src={iconUrl} alt={s.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Server className="w-5 h-5 text-white/30" /></div>}
+   972→                            </div>
+   973→                            <div>
+   974→                              <div className="text-sm text-white/80">{s.name}</div>
+   975→                              <div className="text-[10px] text-white/30">{s.memberCount.toLocaleString()} عضو • {s.onlineCount.toLocaleString()} أونلاين • {timeAgo(s.createdAt)}</div>
+   976→                            </div>
+   977→                          </div>
+   978→                          <Button variant="ghost" size="sm" onClick={() => handleDelete('server', s.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 w-8 h-8 p-0"><Trash2 className="w-3.5 h-3.5" /></Button>
+   979→                        </CardContent>
+   980→                      </Card>
+   981→                    );
+   982→                  })}
+   983→                  {servers.length === 0 && <p className="text-white/30 text-center py-12">لا يوجد سيرفرات بعد</p>}
+   984→                </div>
+   985→              </TabsContent>
+   986→            </Tabs>
+   987→          </>
+   988→        )}
+   989→      </motion.div>
+   990→    </div>
+   991→  );
+   992→}
+   993→
+   994→// ==================== Sub-Components ====================
+   995→function StatBadge({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+   996→  return (
+   997→    <div className="flex flex-col items-center gap-1">
+   998→      <div className="flex items-center gap-1.5 text-white/40">
+   999→        {icon}
+  1000→        <span className="text-xl sm:text-2xl font-bold text-white/80">{value}</span>
+  1001→      </div>
+  1002→      <span className="text-[11px] text-white/30">{label}</span>
+  1003→    </div>
+  1004→  );
+  1005→}
+  1006→
+  1007→function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  1008→  return (
+  1009→    <Card className="bg-white/[0.03] border-white/10">
+  1010→      <CardContent className="p-5 text-center">
+  1011→        <div className="text-white/40 mb-2 flex justify-center">{icon}</div>
+  1012→        <div className="text-2xl font-bold text-white/90 mb-1">{value.toLocaleString()}</div>
+  1013→        <div className="text-xs text-white/40">{label}</div>
+  1014→      </CardContent>
+  1015→    </Card>
+  1016→  );
+  1017→}
+  1018→
+  1019→function GridOverlay() {
+  1020→  return (
+  1021→    <svg className="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
+  1022→      <defs>
+  1023→        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+  1024→          <path d="M 50 0 L 0 0 0 50" fill="none" stroke="white" strokeWidth="0.5" />
+  1025→        </pattern>
+  1026→      </defs>
+  1027→      <rect width="100%" height="100%" fill="url(#grid)" />
+  1028→    </svg>
+  1029→  );
+  1030→}
+  1031→
+  1032→export default AppContent;
+  1033→

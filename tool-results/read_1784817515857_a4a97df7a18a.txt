@@ -1,0 +1,1768 @@
+   196→  }, [text, speed, mounted]);
+   197→
+   198→  return { displayed, isComplete };
+   199→}
+   200→
+   201→function useVisitorCount() {
+   202→  const [count, setCount] = useState(0);
+   203→  const [mounted, setMounted] = useState(false);
+   204→
+   205→  useEffect(() => {
+   206→    setMounted(true);
+   207→    fetch('/api/visitors')
+   208→      .then((res) => res.json())
+   209→      .then((data) => setCount(data.count || 0))
+   210→      .catch(() => {});
+   211→  }, []);
+   212→
+   213→  const formatted = mounted ? count.toLocaleString() : '---';
+   214→  return { count, formatted };
+   215→}
+   216→
+   217→function useParallax(multiplier: number = 0.3) {
+   218→  const ref = useRef<HTMLDivElement>(null);
+   219→  const { scrollY } = useScroll();
+   220→  const y = useTransform(scrollY, [0, 1000], [0, -300 * multiplier]);
+   221→  const opacity = useTransform(scrollY, [0, 600], [1, 0.2]);
+   222→  return { ref, y, opacity };
+   223→}
+   224→
+   225→function useServices() {
+   226→  const [services, setServices] = useState<ServiceStatusData[]>([]);
+   227→  const [loading, setLoading] = useState(true);
+   228→
+   229→  useEffect(() => {
+   230→    fetch('/api/services')
+   231→      .then((res) => res.json())
+   232→      .then((data) => setServices(data.services || []))
+   233→      .catch(console.error)
+   234→      .finally(() => setLoading(false));
+   235→  }, []);
+   236→
+   237→  return { services, loading };
+   238→}
+   239→
+   240→function useSkills() {
+   241→  const [skills, setSkills] = useState<SkillData[]>([]);
+   242→  const [loading, setLoading] = useState(true);
+   243→
+   244→  useEffect(() => {
+   245→    fetch('/api/skills')
+   246→      .then((res) => res.json())
+   247→      .then((data) => setSkills(data.skills || []))
+   248→      .catch(console.error)
+   249→      .finally(() => setLoading(false));
+   250→  }, []);
+   251→
+   252→  return { skills, loading };
+   253→}
+   254→
+   255→function useIdeas() {
+   256→  const [ideas, setIdeas] = useState<IdeaData[]>([]);
+   257→  const [loading, setLoading] = useState(true);
+   258→
+   259→  const fetchIdeas = useCallback(() => {
+   260→    fetch('/api/ideas')
+   261→      .then((res) => res.json())
+   262→      .then((data) => setIdeas(data.ideas || []))
+   263→      .catch(console.error)
+   264→      .finally(() => setLoading(false));
+   265→  }, []);
+   266→
+   267→  useEffect(() => {
+   268→    fetchIdeas();
+   269→  }, [fetchIdeas]);
+   270→
+   271→  const submitIdea = async (title: string, content: string) => {
+   272→    const res = await fetch('/api/ideas', {
+   273→      method: 'POST',
+   274→      headers: { 'Content-Type': 'application/json' },
+   275→      body: JSON.stringify({ title, content }),
+   276→    });
+   277→    const data = await res.json();
+   278→    if (!res.ok) throw new Error(data.error || 'Failed');
+   279→    return data;
+   280→  };
+   281→
+   282→  const voteIdea = async (ideaId: string, type: 'upvote' | 'downvote') => {
+   283→    const res = await fetch('/api/ideas', {
+   284→      method: 'PUT',
+   285→      headers: { 'Content-Type': 'application/json' },
+   286→      body: JSON.stringify({ ideaId, type }),
+   287→    });
+   288→    const data = await res.json();
+   289→    if (!res.ok) throw new Error(data.error || 'Failed');
+   290→    setIdeas((prev) =>
+   291→      prev.map((i) => (i.id === ideaId ? { ...i, votes: data.votes } : i))
+   292→    );
+   293→    return data;
+   294→  };
+   295→
+   296→  return { ideas, loading, submitIdea, voteIdea, refetch: fetchIdeas };
+   297→}
+   298→
+   299→// ==================== Sub-Components ====================
+   300→function MatrixRain() {
+   301→  const canvasRef = useRef<HTMLCanvasElement>(null);
+   302→  const [isVisible, setIsVisible] = useState(false);
+   303→
+   304→  useEffect(() => {
+   305→    const checkDesktop = () => setIsVisible(window.innerWidth >= 1024);
+   306→    checkDesktop();
+   307→    window.addEventListener('resize', checkDesktop);
+   308→    return () => window.removeEventListener('resize', checkDesktop);
+   309→  }, []);
+   310→
+   311→  useEffect(() => {
+   312→    if (!isVisible || !canvasRef.current) return;
+   313→    const canvas = canvasRef.current;
+   314→    const ctx = canvas.getContext('2d');
+   315→    if (!ctx) return;
+   316→
+   317→    const resize = () => {
+   318→      canvas.width = window.innerWidth;
+   319→      canvas.height = window.innerHeight;
+   320→    };
+   321→    resize();
+   322→    window.addEventListener('resize', resize);
+   323→
+   324→    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+   325→    const fontSize = 14;
+   326→    const columns = Math.floor(canvas.width / fontSize);
+   327→    const drops: number[] = Array(columns).fill(1).map(() => Math.random() * -100);
+   328→
+   329→    const draw = () => {
+   330→      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+   331→      ctx.fillRect(0, 0, canvas.width, canvas.height);
+   332→      ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+   333→      ctx.font = `${fontSize}px monospace`;
+   334→
+   335→      for (let i = 0; i < drops.length; i++) {
+   336→        const text = chars.charAt(Math.floor(Math.random() * chars.length));
+   337→        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+   338→        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+   339→          drops[i] = 0;
+   340→        }
+   341→        drops[i]++;
+   342→      }
+   343→    };
+   344→
+   345→    const interval = setInterval(draw, 50);
+   346→
+   347→    return () => {
+   348→      clearInterval(interval);
+   349→      window.removeEventListener('resize', resize);
+   350→    };
+   351→  }, [isVisible]);
+   352→
+   353→  if (!isVisible) return null;
+   354→
+   355→  return (
+   356→    <canvas
+   357→      ref={canvasRef}
+   358→      className="fixed inset-0 pointer-events-none z-0"
+   359→      style={{ opacity: 0.04 }}
+   360→    />
+   361→  );
+   362→}
+   363→
+   364→function TypingText({ text, speed = 50, className = '' }: { text: string; speed?: number; className?: string }) {
+   365→  const { displayed, isComplete } = useTypingEffect(text, speed);
+   366→  return (
+   367→    <span className={className}>
+   368→      {displayed}
+   369→      <span className={`inline-block w-[2px] h-[1em] bg-white/80 ml-0.5 align-middle ${isComplete ? 'animate-pulse' : ''}`}>
+   370→        |
+   371→      </span>
+   372→    </span>
+   373→  );
+   374→}
+   375→
+   376→function SkillBarCard({ skill, index }: { skill: SkillData; index: number }) {
+   377→  const [animated, setAnimated] = useState(false);
+   378→  const ref = useRef<HTMLDivElement>(null);
+   379→
+   380→  useEffect(() => {
+   381→    const observer = new IntersectionObserver(
+   382→      ([entry]) => {
+   383→        if (entry.isIntersecting) {
+   384→          setTimeout(() => setAnimated(true), index * 100);
+   385→          observer.disconnect();
+   386→        }
+   387→      },
+   388→      { threshold: 0.3 }
+   389→    );
+   390→    if (ref.current) observer.observe(ref.current);
+   391→    return () => observer.disconnect();
+   392→  }, [index]);
+   393→
+   394→  const getLevelColor = (level: number) => {
+   395→    if (level >= 80) return 'bg-white';
+   396→    if (level >= 60) return 'bg-white/80';
+   397→    if (level >= 40) return 'bg-white/60';
+   398→    return 'bg-white/40';
+   399→  };
+   400→
+   401→  return (
+   402→    <div ref={ref} className="flex items-center gap-3 group">
+   403→      <span className="text-xs text-white/50 w-28 sm:w-36 text-right truncate flex-shrink-0 group-hover:text-white/70 transition-colors">
+   404→        {skill.name}
+   405→      </span>
+   406→      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+   407→        <motion.div
+   408→          className={`h-full rounded-full ${getLevelColor(skill.level)}`}
+   409→          initial={{ width: 0 }}
+   410→          animate={{ width: animated ? `${skill.level}%` : 0 }}
+   411→          transition={{ duration: 0.8, ease: 'easeOut' }}
+   412→        />
+   413→      </div>
+   414→      <span className="text-[10px] text-white/30 w-8 text-right tabular-nums">{skill.level}%</span>
+   415→    </div>
+   416→  );
+   417→}
+   418→
+   419→function StatusCard({ service, index }: { service: ServiceStatusData; index: number }) {
+   420→  const statusConfig: Record<string, { color: string; bg: string; border: string; label: string; dot: string }> = {
+   421→    operational: { color: 'text-green-400', bg: 'bg-green-400/5', border: 'border-green-400/20', label: 'Operational', dot: 'bg-green-400' },
+   422→    degraded: { color: 'text-yellow-400', bg: 'bg-yellow-400/5', border: 'border-yellow-400/20', label: 'Degraded', dot: 'bg-yellow-400' },
+   423→    down: { color: 'text-red-400', bg: 'bg-red-400/5', border: 'border-red-400/20', label: 'Down', dot: 'bg-red-400' },
+   424→    maintenance: { color: 'text-blue-400', bg: 'bg-blue-400/5', border: 'border-blue-400/20', label: 'Maintenance', dot: 'bg-blue-400' },
+   425→  };
+   426→
+   427→  const config = statusConfig[service.status] || statusConfig.operational;
+   428→
+   429→  return (
+   430→    <motion.div
+   431→      initial={{ opacity: 0, y: 20 }}
+   432→      animate={{ opacity: 1, y: 0 }}
+   433→      transition={{ delay: index * 0.08, duration: 0.4 }}
+   434→    >
+   435→      <Card className={`${config.bg} ${config.border} border hover:brightness-125 transition-all duration-300`}>
+   436→        <CardContent className="p-5">
+   437→          <div className="flex items-center justify-between mb-2">
+   438→            <div className="flex items-center gap-3">
+   439→              <div className={`w-2.5 h-2.5 rounded-full ${config.dot} animate-pulse`} />
+   440→              <h3 className="font-semibold text-sm text-white/90">{service.name}</h3>
+   441→            </div>
+   442→            <Badge variant="secondary" className={`${config.bg} ${config.color} border ${config.border} text-[10px]`}>
+   443→              {config.label}
+   444→            </Badge>
+   445→          </div>
+   446→          {service.description && (
+   447→            <p className="text-xs text-white/40 mb-3">{service.description}</p>
+   448→          )}
+   449→          <div className="flex items-center gap-1.5">
+   450→            <Activity className="w-3 h-3 text-white/30" />
+   451→            <span className="text-[11px] text-white/30">{service.uptime}% uptime</span>
+   452→          </div>
+   453→        </CardContent>
+   454→      </Card>
+   455→    </motion.div>
+   456→  );
+   457→}
+   458→
+   459→function IdeaCard({ idea, onVote }: { idea: IdeaData; onVote: (id: string, type: 'upvote' | 'downvote') => void }) {
+   460→  const timeAgo = (dateStr: string) => {
+   461→    const diff = Date.now() - new Date(dateStr).getTime();
+   462→    const minutes = Math.floor(diff / 60000);
+   463→    const hours = Math.floor(diff / 3600000);
+   464→    const days = Math.floor(diff / 86400000);
+   465→    if (minutes < 1) return 'just now';
+   466→    if (minutes < 60) return `${minutes}m ago`;
+   467→    if (hours < 24) return `${hours}h ago`;
+   468→    return `${days}d ago`;
+   469→  };
+   470→
+   471→  return (
+   472→    <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300">
+   473→      <CardContent className="p-5">
+   474→        <div className="flex gap-4">
+   475→          <div className="flex flex-col items-center gap-1 flex-shrink-0">
+   476→            <button
+   477→              onClick={() => onVote(idea.id, 'upvote')}
+   478→              className="text-white/30 hover:text-white/80 transition-colors p-1"
+   479→              aria-label="Upvote"
+   480→            >
+   481→              <ThumbsUp className="w-4 h-4" />
+   482→            </button>
+   483→            <span className="text-sm font-bold text-white/70 tabular-nums min-w-[24px] text-center">
+   484→              {idea.votes}
+   485→            </span>
+   486→            <button
+   487→              onClick={() => onVote(idea.id, 'downvote')}
+   488→              className="text-white/30 hover:text-red-400/80 transition-colors p-1"
+   489→              aria-label="Downvote"
+   490→            >
+   491→              <ThumbsDown className="w-4 h-4" />
+   492→            </button>
+   493→          </div>
+   494→          <div className="flex-1 min-w-0">
+   495→            <h3 className="font-semibold text-sm text-white/90 mb-1 truncate">{idea.title}</h3>
+   496→            <p className="text-xs text-white/50 leading-relaxed line-clamp-3 mb-2">{idea.content}</p>
+   497→            <span className="text-[10px] text-white/25">{timeAgo(idea.createdAt)}</span>
+   498→          </div>
+   499→        </div>
+   500→      </CardContent>
+   501→    </Card>
+   502→  );
+   503→}
+   504→
+   505→function StatBadge({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+   506→  return (
+   507→    <div className="flex flex-col items-center gap-1">
+   508→      <div className="flex items-center gap-1.5 text-white/40">
+   509→        {icon}
+   510→        <span className="text-xl sm:text-2xl font-bold text-white/80">{value}</span>
+   511→      </div>
+   512→      <span className="text-[11px] text-white/30">{label}</span>
+   513→    </div>
+   514→  );
+   515→}
+   516→
+   517→function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+   518→  return (
+   519→    <Card className="bg-white/[0.03] border-white/10">
+   520→      <CardContent className="p-5 text-center">
+   521→        <div className="text-white/40 mb-2 flex justify-center">{icon}</div>
+   522→        <div className="text-2xl font-bold text-white/90 mb-1">{value.toLocaleString()}</div>
+   523→        <div className="text-xs text-white/40">{label}</div>
+   524→      </CardContent>
+   525→    </Card>
+   526→  );
+   527→}
+   528→
+   529→function GridOverlay() {
+   530→  return (
+   531→    <svg className="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
+   532→      <defs>
+   533→        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+   534→          <path d="M 50 0 L 0 0 0 50" fill="none" stroke="white" strokeWidth="0.5" />
+   535→        </pattern>
+   536→      </defs>
+   537→      <rect width="100%" height="100%" fill="url(#grid)" />
+   538→    </svg>
+   539→  );
+   540→}
+   541→
+   542→const DiscordIcon = ({ className }: { className?: string }) => (
+   543→  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+   544→    <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286z" />
+   545→  </svg>
+   546→);
+   547→
+   548→// ==================== Ambient Music ====================
+   549→function AmbientMusic() {
+   550→  const audioRef = useRef<HTMLAudioElement>(null);
+   551→  const [muted, setMuted] = useState(true);
+   552→  const [mounted, setMounted] = useState(false);
+   553→
+   554→  useEffect(() => {
+   555→    setMounted(true);
+   556→    const saved = localStorage.getItem('ambient-music-muted');
+   557→    if (saved !== null) {
+   558→      setMuted(saved === 'true');
+   559→    }
+   560→  }, []);
+   561→
+   562→  useEffect(() => {
+   563→    if (!mounted || !audioRef.current) return;
+   564→    audioRef.current.muted = muted;
+   565→    audioRef.current.volume = 0.3;
+   566→  }, [muted, mounted]);
+   567→
+   568→  const toggle = () => {
+   569→    const next = !muted;
+   570→    setMuted(next);
+   571→    if (mounted) {
+   572→      localStorage.setItem('ambient-music-muted', String(next));
+   573→    }
+   574→    if (audioRef.current && next === false) {
+   575→      audioRef.current.play().catch(() => {});
+   576→    }
+   577→  };
+   578→
+   579→  return (
+   580→    <>
+   581→      <audio ref={audioRef} src="https://cdn.freesound.org/previews/612/612095_5674468-lq.mp3" loop preload="none" />
+   582→      <Button
+   583→        variant="ghost"
+   584→        size="sm"
+   585→        onClick={toggle}
+   586→        className="text-white/40 hover:text-white/80 hover:bg-white/5 w-8 h-8 p-0"
+   587→        aria-label={muted ? 'Unmute music' : 'Mute music'}
+   588→      >
+   589→        {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+   590→      </Button>
+   591→    </>
+   592→  );
+   593→}
+   594→
+   595→// ==================== Main App ====================
+   596→function AppContent() {
+   597→  return (
+   598→    <SessionProvider>
+   599→      <MainApp />
+   600→    </SessionProvider>
+   601→  );
+   602→}
+   603→
+   604→function MainApp() {
+   605→  const [currentView, setCurrentView] = useState<ViewType>('profile');
+   606→  const { data: session, status } = useSession();
+   607→  const isAdmin = status === 'authenticated' && session?.user?.id === ADMIN_DISCORD_ID;
+   608→  const { formatted: visitorFormatted } = useVisitorCount();
+   609→
+   610→  const navItems: { view: ViewType; label: string; icon: React.ReactNode; adminOnly: boolean }[] = [
+   611→    { view: 'profile', label: 'الرئيسية', icon: <Terminal className="w-4 h-4" />, adminOnly: false },
+   612→    { view: 'projects', label: 'المشاريع', icon: <Code2 className="w-4 h-4" />, adminOnly: false },
+   613→    { view: 'status', label: 'الحالة', icon: <Activity className="w-4 h-4" />, adminOnly: false },
+   614→    { view: 'ideas', label: 'أفكار', icon: <Lightbulb className="w-4 h-4" />, adminOnly: false },
+   615→    { view: 'servers', label: 'سيرفرات', icon: <Server className="w-4 h-4" />, adminOnly: true },
+   616→    { view: 'admin', label: 'الإدارة', icon: <Settings className="w-4 h-4" />, adminOnly: true },
+   617→  ];
+   618→
+   619→  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+   620→
+   621→  return (
+   622→    <div className="min-h-screen bg-black text-white flex flex-col">
+   623→      {/* Matrix Rain Background */}
+   624→      <MatrixRain />
+   625→
+   626→      {/* Gradient Background */}
+   627→      <div className="fixed inset-0 -z-10 overflow-hidden">
+   628→        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)]" />
+   629→        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,_rgba(255,255,255,0.06)_0%,_transparent_60%)] blur-3xl animate-pulse" />
+   630→        <GridOverlay />
+   631→      </div>
+   632→
+   633→      {/* Header */}
+   634→      <header className="border-b border-white/10 backdrop-blur-md bg-black/50 sticky top-0 z-50">
+   635→        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+   636→          <div className="flex items-center gap-2 sm:gap-3">
+   637→            <Terminal className="w-5 h-5 text-white/60" />
+   638→            <span className="font-mono text-sm text-white/60">6p99.dev</span>
+   639→            {currentView !== 'profile' && (
+   640→              <Button
+   641→                variant="ghost"
+   642→                size="sm"
+   643→                onClick={() => setCurrentView('profile')}
+   644→                className="text-white/50 hover:text-white hover:bg-white/5 ml-1"
+   645→              >
+   646→                <ArrowLeft className="w-4 h-4 mr-1" />
+   647→                <span className="hidden sm:inline">الرئيسية</span>
+   648→              </Button>
+   649→            )}
+   650→          </div>
+   651→
+   652→          {/* Center Nav - Desktop */}
+   653→          <nav className="hidden md:flex items-center gap-1" role="navigation" aria-label="Main navigation">
+   654→            {visibleNavItems.map((item) => (
+   655→              <Button
+   656→                key={item.view}
+   657→                variant="ghost"
+   658→                size="sm"
+   659→                onClick={() => setCurrentView(item.view)}
+   660→                className={`text-white/50 hover:text-white hover:bg-white/5 ${
+   661→                  currentView === item.view ? 'text-white bg-white/10' : ''
+   662→                }`}
+   663→              >
+   664→                {item.icon}
+   665→                <span className="ml-1.5">{item.label}</span>
+   666→              </Button>
+   667→            ))}
+   668→          </nav>
+   669→
+   670→          {/* Right Side */}
+   671→          <div className="flex items-center gap-1 sm:gap-2">
+   672→            {/* Visitor Counter */}
+   673→            <div className="hidden sm:flex items-center gap-1.5 text-white/30 text-xs mr-2">
+   674→              <Eye className="w-3.5 h-3.5" />
+   675→              <span className="tabular-nums">{visitorFormatted}</span>
+   676→            </div>
+   677→
+   678→            {/* Ambient Music */}
+   679→            <AmbientMusic />
+   680→
+   681→            {/* Mobile Nav Dropdown */}
+   682→            <div className="md:hidden flex items-center gap-1">
+   683→              {visibleNavItems
+   684→                .filter((item) => item.view !== 'profile')
+   685→                .slice(0, 3)
+   686→                .map((item) => (
+   687→                  <Button
+   688→                    key={item.view}
+   689→                    variant="ghost"
+   690→                    size="sm"
+   691→                    onClick={() => setCurrentView(item.view)}
+   692→                    className={`text-white/50 hover:text-white hover:bg-white/5 w-8 h-8 p-0 ${
+   693→                      currentView === item.view ? 'text-white bg-white/10' : ''
+   694→                    }`}
+   695→                    aria-label={item.label}
+   696→                  >
+   697→                    {item.icon}
+   698→                  </Button>
+   699→                ))}
+   700→            </div>
+   701→
+   702→            {status === 'authenticated' && session?.user ? (
+   703→              <div className="flex items-center gap-2">
+   704→                <Avatar className="w-8 h-8 border border-white/20">
+   705→                  <AvatarImage src={session.user.image || undefined} />
+   706→                  <AvatarFallback className="bg-white/10 text-white text-xs">
+   707→                    <User className="w-3 h-3" />
+   708→                  </AvatarFallback>
+   709→                </Avatar>
+   710→                <span className="text-sm text-white/80 hidden lg:inline">
+   711→                  {session.user.name || 'User'}
+   712→                </span>
+   713→                <Button
+   714→                  variant="ghost"
+   715→                  size="sm"
+   716→                  onClick={() => {
+   717→                    window.location.href = '/api/auth/signout?callbackUrl=/';
+   718→                  }}
+   719→                  className="text-white/60 hover:text-white hover:bg-white/5"
+   720→                >
+   721→                  <LogOut className="w-4 h-4" />
+   722→                </Button>
+   723→              </div>
+   724→            ) : (
+   725→              <Button
+   726→                onClick={() => {
+   727→                  window.location.href = `/api/auth/signin/discord?callbackUrl=${encodeURIComponent('/')}`;
+   728→                }}
+   729→                size="sm"
+   730→                className="bg-white text-black hover:bg-white/90 font-medium"
+   731→              >
+   732→                <DiscordIcon className="w-4 h-4 mr-2" />
+   733→                <span className="hidden sm:inline">دخول ديسكورد</span>
+   734→              </Button>
+   735→            )}
+   736→          </div>
+   737→        </div>
+   738→      </header>
+   739→
+   740→      {/* Content */}
+   741→      <main className="flex-1">
+   742→        <AnimatePresence mode="wait">
+   743→          {currentView === 'profile' && <ProfileView key="profile" />}
+   744→          {currentView === 'servers' && isAdmin && <ServersView key="servers" />}
+   745→          {currentView === 'admin' && isAdmin && <AdminView key="admin" />}
+   746→          {currentView === 'status' && <StatusView key="status" />}
+   747→          {currentView === 'projects' && <ProjectsView key="projects" />}
+   748→          {currentView === 'ideas' && <IdeasView key="ideas" />}
+   749→        </AnimatePresence>
+   750→      </main>
+   751→
+   752→      {/* Footer */}
+   753→      <footer className="border-t border-white/10 bg-black/50 backdrop-blur-md mt-auto">
+   754→        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+   755→          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+   756→            <div className="flex items-center gap-2 text-white/30 text-sm">
+   757→              <Terminal className="w-4 h-4" />
+   758→              <span>© {new Date().getFullYear()} MJHOL — 6p99</span>
+   759→            </div>
+   760→            <div className="flex items-center gap-4">
+   761→              <button
+   762→                onClick={() => setCurrentView('status')}
+   763→                className="text-white/20 hover:text-white/50 text-xs transition-colors"
+   764→              >
+   765→                Service Status
+   766→              </button>
+   767→              <button
+   768→                onClick={() => setCurrentView('ideas')}
+   769→                className="text-white/20 hover:text-white/50 text-xs transition-colors"
+   770→              >
+   771→                Ideas Board
+   772→              </button>
+   773→            </div>
+   774→          </div>
+   775→        </div>
+   776→      </footer>
+   777→    </div>
+   778→  );
+   779→}
+   780→
+   781→// ==================== Profile View ====================
+   782→function ProfileView() {
+   783→  const { data: session, status } = useSession();
+   784→  const { profile, repos, loading } = useGithubData();
+   785→  const { skills, loading: skillsLoading } = useSkills();
+   786→  const [comments, setComments] = useState<Comment[]>([]);
+   787→  const [newComment, setNewComment] = useState('');
+   788→  const [sending, setSending] = useState(false);
+   789→  const [error, setError] = useState('');
+   790→  const [cooldownInfo, setCooldownInfo] = useState<{ active: boolean; remaining: string } | null>(null);
+   791→  const [reposExpanded, setReposExpanded] = useState(false);
+   792→  const { ref: heroRef, y, opacity } = useParallax(0.3);
+   793→
+   794→  const fetchComments = useCallback(() => {
+   795→    fetch('/api/comments')
+   796→      .then((res) => res.json())
+   797→      .then((data) => setComments(data.comments || []))
+   798→      .catch(console.error);
+   799→  }, []);
+   800→
+   801→  useEffect(() => {
+   802→    fetchComments();
+   803→    const interval = setInterval(fetchComments, 30000);
+   804→    return () => clearInterval(interval);
+   805→  }, [fetchComments]);
+   806→
+   807→  const handleSubmitComment = async () => {
+   808→    if (!newComment.trim()) return;
+   809→    setSending(true);
+   810→    setError('');
+   811→    try {
+   812→      const res = await fetch('/api/comments', {
+   813→        method: 'POST',
+   814→        headers: { 'Content-Type': 'application/json' },
+   815→        body: JSON.stringify({ content: newComment }),
+   816→      });
+   817→      const data = await res.json();
+   818→      if (!res.ok) {
+   819→        if (res.status === 401) setError('يجب تسجيل الدخول عبر ديسكورد أولاً للتعليق');
+   820→        else if (res.status === 429) {
+   821→          if (data.cooldownRemaining) {
+   822→            const hours = Math.floor(data.cooldownRemaining / 3600000);
+   823→            const minutes = Math.floor((data.cooldownRemaining % 3600000) / 60000);
+   824→            setCooldownInfo({ active: true, remaining: `${hours}س ${minutes}د` });
+   825→          }
+   826→          setError(data.error || 'تم تقييد الطلبات، حاول لاحقاً');
+   827→        } else setError(data.error || 'حدث خطأ');
+   828→        return;
+   829→      }
+   830→      setNewComment('');
+   831→      setError('');
+   832→      setCooldownInfo(null);
+   833→      fetchComments();
+   834→    } catch {
+   835→      setError('فشل إرسال التعليق');
+   836→    } finally {
+   837→      setSending(false);
+   838→    }
+   839→  };
+   840→
+   841→  const signInDiscord = () => {
+   842→    window.location.href = `/api/auth/signin/discord?callbackUrl=${encodeURIComponent('/')}`;
+   843→  };
+   844→
+   845→  const timeAgo = (dateStr: string) => {
+   846→    const diff = Date.now() - new Date(dateStr).getTime();
+   847→    const minutes = Math.floor(diff / 60000);
+   848→    const hours = Math.floor(diff / 3600000);
+   849→    const days = Math.floor(diff / 86400000);
+   850→    if (minutes < 1) return 'الآن';
+   851→    if (minutes < 60) return `منذ ${minutes} دقيقة`;
+   852→    if (hours < 24) return `منذ ${hours} ساعة`;
+   853→    return `منذ ${days} يوم`;
+   854→  };
+   855→
+   856→  const displayRepos = reposExpanded ? repos : repos.slice(0, 6);
+   857→
+   858→  // Group skills by category
+   859→  const skillsByCategory = useMemo(() => {
+   860→    const groups: Record<string, SkillData[]> = {};
+   861→    for (const skill of skills) {
+   862→      const cat = skill.category || 'Other';
+   863→      if (!groups[cat]) groups[cat] = [];
+   864→      groups[cat].push(skill);
+   865→    }
+   866→    return groups;
+   867→  }, [skills]);
+   868→
+   869→  const displayName = profile?.name || 'MJHOL';
+   870→  const displayBio = profile?.bio || 'I am curious about everything; I try to understand and program everything—the possible and the impossible.';
+   871→
+   872→  return (
+   873→    <motion.div
+   874→      initial={{ opacity: 0 }}
+   875→      animate={{ opacity: 1 }}
+   876→      exit={{ opacity: 0 }}
+   877→      transition={{ duration: 0.3 }}
+   878→      className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20"
+   879→    >
+   880→      {/* Hero with Parallax */}
+   881→      <section ref={heroRef} className="flex flex-col items-center text-center mb-20">
+   882→        <motion.div style={{ y, opacity }} className="contents">
+   883→          <motion.div
+   884→            initial={{ opacity: 0, scale: 0.8 }}
+   885→            animate={{ opacity: 1, scale: 1 }}
+   886→            transition={{ duration: 0.6, ease: 'easeOut' }}
+   887→            className="relative mb-8"
+   888→          >
+   889→            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-2 border-white/20 shadow-2xl shadow-white/5">
+   890→              {loading ? (
+   891→                <Skeleton className="w-full h-full bg-white/10" />
+   892→              ) : (
+   893→                <img
+   894→                  src={profile?.avatarUrl || '/placeholder.png'}
+   895→                  alt={profile?.name || '6p99'}
+   896→                  className="w-full h-full object-cover"
+   897→                />
+   898→              )}
+   899→            </div>
+   900→            <motion.div
+   901→              className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-green-500 border-4 border-black flex items-center justify-center"
+   902→              initial={{ scale: 0 }}
+   903→              animate={{ scale: 1 }}
+   904→              transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
+   905→            >
+   906→              <span className="text-[10px]">●</span>
+   907→            </motion.div>
+   908→          </motion.div>
+   909→
+   910→          <motion.div
+   911→            initial={{ opacity: 0, y: 20 }}
+   912→            animate={{ opacity: 1, y: 0 }}
+   913→            transition={{ delay: 0.2, duration: 0.5 }}
+   914→            className="h-16 sm:h-20 flex items-center justify-center mb-3"
+   915→          >
+   916→            {loading ? (
+   917→              <Skeleton className="h-12 w-48 mx-auto bg-white/10" />
+   918→            ) : (
+   919→              <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
+   920→                <TypingText text={displayName} speed={80} />
+   921→              </h1>
+   922→            )}
+   923→          </motion.div>
+   924→
+   925→          <motion.p
+   926→            initial={{ opacity: 0, y: 20 }}
+   927→            animate={{ opacity: 1, y: 0 }}
+   928→            transition={{ delay: 0.3, duration: 0.5 }}
+   929→            className="text-base sm:text-lg text-white/50 max-w-2xl mb-2 font-mono"
+   930→          >
+   931→            @6p99
+   932→          </motion.p>
+   933→
+   934→          <motion.div
+   935→            initial={{ opacity: 0, y: 20 }}
+   936→            animate={{ opacity: 1, y: 0 }}
+   937→            transition={{ delay: 0.4, duration: 0.5 }}
+   938→            className="text-white/40 max-w-xl mb-8 text-sm sm:text-base leading-relaxed min-h-[3rem]"
+   939→          >
+   940→            {loading ? (
+   941→              'Loading...'
+   942→            ) : (
+   943→              <TypingText text={displayBio} speed={25} />
+   944→            )}
+   945→          </motion.div>
+   946→
+   947→          <motion.div
+   948→            initial={{ opacity: 0, y: 20 }}
+   949→            animate={{ opacity: 1, y: 0 }}
+   950→            transition={{ delay: 0.5, duration: 0.5 }}
+   951→            className="flex items-center gap-6 sm:gap-8 mb-8"
+   952→          >
+   953→            <StatBadge icon={<BookOpen className="w-4 h-4" />} value={profile?.publicRepos || 10} label="مستودعات" />
+   954→            <StatBadge icon={<Star className="w-4 h-4" />} value={profile?.followers || 0} label="متابعين" />
+   955→            <StatBadge icon={<Github className="w-4 h-4" />} value={profile?.following || 4} label="يتابع" />
+   956→          </motion.div>
+   957→
+   958→          <motion.div
+   959→            initial={{ opacity: 0, y: 20 }}
+   960→            animate={{ opacity: 1, y: 0 }}
+   961→            transition={{ delay: 0.6, duration: 0.5 }}
+   962→            className="flex items-center gap-4"
+   963→          >
+   964→            <a
+   965→              href="https://github.com/6p99"
+   966→              target="_blank"
+   967→              rel="noopener noreferrer"
+   968→              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-all"
+   969→            >
+   970→              <Github className="w-5 h-5" />
+   971→              GitHub
+   972→            </a>
+   973→          </motion.div>
+   974→        </motion.div>
+   975→      </section>
+   976→
+   977→      {/* Skills Section */}
+   978→      {!skillsLoading && skills.length > 0 && (
+   979→        <section className="mb-20">
+   980→          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+   981→            <div className="flex items-center justify-between mb-8">
+   982→              <div>
+   983→                <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+   984→                  <Zap className="w-7 h-7 text-white/40" />
+   985→                  المهارات
+   986→                </h2>
+   987→                <p className="text-white/40 text-sm mt-1">التقنيات والمهارات البرمجية</p>
+   988→              </div>
+   989→            </div>
+   990→            <div className="space-y-8">
+   991→              {Object.entries(skillsByCategory).map(([category, catSkills]) => (
+   992→                <Card key={category} className="bg-white/[0.03] border-white/10">
+   993→                  <CardHeader className="pb-3">
+   994→                    <h3 className="text-sm font-semibold text-white/60 flex items-center gap-2">
+   995→                      <Layers className="w-4 h-4" />
+   996→                      {category}
+   997→                    </h3>
+   998→                  </CardHeader>
+   999→                  <CardContent className="space-y-3">
+  1000→                    {catSkills.map((skill, i) => (
+  1001→                      <SkillBarCard key={skill.id} skill={skill} index={i} />
+  1002→                    ))}
+  1003→                  </CardContent>
+  1004→                </Card>
+  1005→              ))}
+  1006→            </div>
+  1007→          </motion.div>
+  1008→        </section>
+  1009→      )}
+  1010→
+  1011→      {/* Repositories */}
+  1012→      <section className="mb-20">
+  1013→        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+  1014→          <div className="flex items-center justify-between mb-8">
+  1015→            <div>
+  1016→              <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+  1017→                <Code2 className="w-7 h-7 text-white/40" />
+  1018→                المستودعات
+  1019→              </h2>
+  1020→              <p className="text-white/40 text-sm mt-1">أحدث المشاريع والمستودعات</p>
+  1021→            </div>
+  1022→            {repos.length > 6 && (
+  1023→              <Button variant="ghost" size="sm" onClick={() => setReposExpanded(!reposExpanded)} className="text-white/60 hover:text-white hover:bg-white/5">
+  1024→                {reposExpanded ? (
+  1025→                  <><ChevronUp className="w-4 h-4 mr-1" />عرض أقل</>
+  1026→                ) : (
+  1027→                  <><ChevronDown className="w-4 h-4 mr-1" />عرض الكل ({repos.length})</>
+  1028→                )}
+  1029→              </Button>
+  1030→            )}
+  1031→          </div>
+  1032→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1033→            {loading
+  1034→              ? Array.from({ length: 6 }).map((_, i) => (
+  1035→                  <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-5 w-32 bg-white/10 mb-3" /><Skeleton className="h-4 w-full bg-white/10 mb-2" /><Skeleton className="h-4 w-24 bg-white/10" /></CardContent></Card>
+  1036→                ))
+  1037→              : displayRepos.map((repo, i) => (
+  1038→                  <motion.div key={repo.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05, duration: 0.4 }}>
+  1039→                    <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300 group cursor-pointer h-full">
+  1040→                      <CardContent className="p-5">
+  1041→                        <div className="flex items-start justify-between mb-3">
+  1042→                          <div className="flex items-center gap-2 min-w-0">
+  1043→                            <BookOpen className="w-4 h-4 text-white/30 flex-shrink-0" />
+  1044→                            <h3 className="font-semibold text-sm truncate group-hover:text-white/90">{repo.name}</h3>
+  1045→                          </div>
+  1046→                          <a href={repo.url} target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white/80 transition-colors flex-shrink-0 ml-2">
+  1047→                            <ExternalLink className="w-3.5 h-3.5" />
+  1048→                          </a>
+  1049→                        </div>
+  1050→                        {repo.description && <p className="text-xs text-white/40 mb-3 line-clamp-2 leading-relaxed">{repo.description}</p>}
+  1051→                        <div className="flex items-center gap-3 mt-auto">
+  1052→                          {repo.language && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: repo.color || '#8b8b8b' }} /><span className="text-xs text-white/50">{repo.language}</span></div>}
+  1053→                          {repo.stars > 0 && <div className="flex items-center gap-1 text-white/40"><Star className="w-3 h-3" /><span className="text-xs">{repo.stars}</span></div>}
+  1054→                          {repo.forks > 0 && <div className="flex items-center gap-1 text-white/40"><GitFork className="w-3 h-3" /><span className="text-xs">{repo.forks}</span></div>}
+  1055→                        </div>
+  1056→                      </CardContent>
+  1057→                    </Card>
+  1058→                  </motion.div>
+  1059→                ))}
+  1060→          </div>
+  1061→        </motion.div>
+  1062→      </section>
+  1063→
+  1064→      {/* Comments */}
+  1065→      <section className="mb-20">
+  1066→        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+  1067→          <div className="flex items-center justify-between mb-8">
+  1068→            <div>
+  1069→              <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+  1070→                <MessageSquare className="w-7 h-7 text-white/40" />
+  1071→                التعليقات
+  1072→              </h2>
+  1073→              <p className="text-white/40 text-sm mt-1">شاركنا رأيك • يمكنك التعليق كل 6 ساعات</p>
+  1074→            </div>
+  1075→            <Badge variant="secondary" className="bg-white/10 text-white/60 border-white/10">{comments.length} تعليق</Badge>
+  1076→          </div>
+  1077→
+  1078→          <Card className="bg-white/[0.03] border-white/10 mb-6">
+  1079→            <CardContent className="p-5">
+  1080→              {status === 'authenticated' ? (
+  1081→                <div className="space-y-3">
+  1082→                  <div className="flex items-center gap-2 mb-2">
+  1083→                    <Avatar className="w-6 h-6 border border-white/20">
+  1084→                      <AvatarImage src={session?.user?.image || undefined} />
+  1085→                      <AvatarFallback className="bg-white/10 text-white text-[10px]"><User className="w-3 h-3" /></AvatarFallback>
+  1086→                    </Avatar>
+  1087→                    <span className="text-xs text-white/50">معلّق كـ {session?.user?.name || 'User'}</span>
+  1088→                  </div>
+  1089→                  <Textarea
+  1090→                    value={newComment}
+  1091→                    onChange={(e) => setNewComment(e.target.value)}
+  1092→                    placeholder="اكتب تعليقك هنا..."
+  1093→                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none min-h-[80px] focus:border-white/30 focus:ring-white/20"
+  1094→                    maxLength={500}
+  1095→                  />
+  1096→                  <div className="flex items-center justify-between">
+  1097→                    <div className="flex items-center gap-2">
+  1098→                      {cooldownInfo?.active && (
+  1099→                        <div className="flex items-center gap-1 text-xs text-yellow-500/80"><Clock className="w-3 h-3" /><span>يمكنك التعليق بعد {cooldownInfo.remaining}</span></div>
+  1100→                      )}
+  1101→                      <span className="text-xs text-white/30">{newComment.length}/500</span>
+  1102→                    </div>
+  1103→                    <Button onClick={handleSubmitComment} disabled={sending || !newComment.trim()} size="sm" className="bg-white text-black hover:bg-white/90 font-medium">
+  1104→                      {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+  1105→                      إرسال
+  1106→                    </Button>
+  1107→                  </div>
+  1108→                  {error && <div className="flex items-center gap-2 text-xs text-red-400"><AlertCircle className="w-3 h-3" /><span>{error}</span></div>}
+  1109→                </div>
+  1110→              ) : (
+  1111→                <div className="text-center py-6">
+  1112→                  <p className="text-white/40 text-sm mb-4">سجّل دخولك عبر ديسكورد لتتمكن من التعليق</p>
+  1113→                  <Button onClick={signInDiscord} className="bg-white text-black hover:bg-white/90 font-medium">
+  1114→                    <DiscordIcon className="w-4 h-4 mr-2" />
+  1115→                    تسجيل الدخول عبر ديسكورد
+  1116→                  </Button>
+  1117→                </div>
+  1118→              )}
+  1119→            </CardContent>
+  1120→          </Card>
+  1121→
+  1122→          <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+  1123→            <AnimatePresence mode="popLayout">
+  1124→              {comments.length === 0 ? (
+  1125→                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+  1126→                  <MessageSquare className="w-10 h-10 text-white/10 mx-auto mb-3" />
+  1127→                  <p className="text-white/30 text-sm">لا توجد تعليقات بعد. كن أول من يعلّق!</p>
+  1128→                </motion.div>
+  1129→              ) : (
+  1130→                comments.map((comment, i) => (
+  1131→                  <motion.div key={comment.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.03, duration: 0.3 }}>
+  1132→                    <Card className="bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+  1133→                      <CardContent className="p-4">
+  1134→                        <div className="flex items-start gap-3">
+  1135→                          <Avatar className="w-8 h-8 border border-white/10 flex-shrink-0">
+  1136→                            <AvatarImage src={comment.avatar || undefined} />
+  1137→                            <AvatarFallback className="bg-white/10 text-white text-xs">{comment.username.charAt(0).toUpperCase()}</AvatarFallback>
+  1138→                          </Avatar>
+  1139→                          <div className="flex-1 min-w-0">
+  1140→                            <div className="flex items-center gap-2 mb-1">
+  1141→                              <span className="text-sm font-medium text-white/80">{comment.username}{comment.discriminator && comment.discriminator !== '0' && <span className="text-white/30">#{comment.discriminator}</span>}</span>
+  1142→                              <span className="text-[11px] text-white/25">{timeAgo(comment.createdAt)}</span>
+  1143→                            </div>
+  1144→                            <p className="text-sm text-white/60 leading-relaxed break-words">{comment.content}</p>
+  1145→                          </div>
+  1146→                        </div>
+  1147→                      </CardContent>
+  1148→                    </Card>
+  1149→                  </motion.div>
+  1150→                ))
+  1151→              )}
+  1152→            </AnimatePresence>
+  1153→          </div>
+  1154→        </motion.div>
+  1155→      </section>
+  1156→    </motion.div>
+  1157→  );
+  1158→}
+  1159→
+  1160→// ==================== Projects View ====================
+  1161→function ProjectsView() {
+  1162→  const { repos, loading } = useGithubData();
+  1163→  const [expandedRepo, setExpandedRepo] = useState<string | null>(null);
+  1164→  const [languageFilter, setLanguageFilter] = useState<string>('all');
+  1165→
+  1166→  const languages = useMemo(() => {
+  1167→    const langs = new Set<string>();
+  1168→    repos.forEach((r) => { if (r.language) langs.add(r.language); });
+  1169→    return Array.from(langs).sort();
+  1170→  }, [repos]);
+  1171→
+  1172→  const filteredRepos = useMemo(() => {
+  1173→    if (languageFilter === 'all') return repos;
+  1174→    return repos.filter((r) => r.language === languageFilter);
+  1175→  }, [repos, languageFilter]);
+  1176→
+  1177→  return (
+  1178→    <motion.div
+  1179→      initial={{ opacity: 0 }}
+  1180→      animate={{ opacity: 1 }}
+  1181→      exit={{ opacity: 0 }}
+  1182→      transition={{ duration: 0.3 }}
+  1183→      className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20"
+  1184→    >
+  1185→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+  1186→        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
+  1187→          <div>
+  1188→            <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+  1189→              <Code2 className="w-8 h-8 text-white/40" />
+  1190→              المشاريع
+  1191→            </h1>
+  1192→            <p className="text-white/40 text-sm mt-2">جميع المشاريع والمستودعات على GitHub</p>
+  1193→          </div>
+  1194→          <Badge variant="secondary" className="bg-white/10 text-white/60 border-white/10">{filteredRepos.length} مشروع</Badge>
+  1195→        </div>
+  1196→
+  1197→        {/* Language Filter */}
+  1198→        {languages.length > 0 && (
+  1199→          <div className="flex items-center gap-2 mb-8 flex-wrap">
+  1200→            <Filter className="w-4 h-4 text-white/30" />
+  1201→            <Button
+  1202→              variant="ghost"
+  1203→              size="sm"
+  1204→              onClick={() => setLanguageFilter('all')}
+  1205→              className={`text-xs ${languageFilter === 'all' ? 'text-white bg-white/10' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+  1206→            >
+  1207→              الكل
+  1208→            </Button>
+  1209→            {languages.map((lang) => (
+  1210→              <Button
+  1211→                key={lang}
+  1212→                variant="ghost"
+  1213→                size="sm"
+  1214→                onClick={() => setLanguageFilter(lang)}
+  1215→                className={`text-xs ${languageFilter === lang ? 'text-white bg-white/10' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+  1216→              >
+  1217→                {lang}
+  1218→              </Button>
+  1219→            ))}
+  1220→          </div>
+  1221→        )}
+  1222→
+  1223→        {loading ? (
+  1224→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1225→            {Array.from({ length: 6 }).map((_, i) => (
+  1226→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-5 w-32 bg-white/10 mb-3" /><Skeleton className="h-4 w-full bg-white/10 mb-2" /><Skeleton className="h-4 w-24 bg-white/10" /></CardContent></Card>
+  1227→            ))}
+  1228→          </div>
+  1229→        ) : filteredRepos.length === 0 ? (
+  1230→          <div className="text-center py-20">
+  1231→            <Code2 className="w-16 h-16 text-white/10 mx-auto mb-4" />
+  1232→            <p className="text-white/30">لا توجد مشاريع</p>
+  1233→          </div>
+  1234→        ) : (
+  1235→          <div className="space-y-3">
+  1236→            {filteredRepos.map((repo, i) => (
+  1237→              <motion.div
+  1238→                key={repo.name}
+  1239→                initial={{ opacity: 0, y: 10 }}
+  1240→                animate={{ opacity: 1, y: 0 }}
+  1241→                transition={{ delay: i * 0.03, duration: 0.3 }}
+  1242→              >
+  1243→                <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300">
+  1244→                  <Collapsible open={expandedRepo === repo.name} onOpenChange={(open) => setExpandedRepo(open ? repo.name : null)}>
+  1245→                    <CollapsibleTrigger asChild>
+  1246→                      <button className="w-full text-left p-5">
+  1247→                        <div className="flex items-start justify-between gap-4">
+  1248→                          <div className="flex-1 min-w-0">
+  1249→                            <div className="flex items-center gap-3 mb-2">
+  1250→                              <BookOpen className="w-4 h-4 text-white/30 flex-shrink-0" />
+  1251→                              <h3 className="font-semibold text-sm text-white/90 truncate">{repo.name}</h3>
+  1252→                              {repo.language && (
+  1253→                                <div className="flex items-center gap-1.5">
+  1254→                                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: repo.color || '#8b8b8b' }} />
+  1255→                                  <span className="text-xs text-white/50">{repo.language}</span>
+  1256→                                </div>
+  1257→                              )}
+  1258→                            </div>
+  1259→                            <p className="text-xs text-white/40 line-clamp-1">{repo.description || 'No description'}</p>
+  1260→                          </div>
+  1261→                          <div className="flex items-center gap-3 flex-shrink-0">
+  1262→                            <div className="flex items-center gap-3 text-white/40">
+  1263→                              {repo.stars > 0 && <div className="flex items-center gap-1"><Star className="w-3.5 h-3.5" /><span className="text-xs">{repo.stars}</span></div>}
+  1264→                              {repo.forks > 0 && <div className="flex items-center gap-1"><GitFork className="w-3.5 h-3.5" /><span className="text-xs">{repo.forks}</span></div>}
+  1265→                            </div>
+  1266→                            {expandedRepo === repo.name ? (
+  1267→                              <ChevronUp className="w-4 h-4 text-white/30" />
+  1268→                            ) : (
+  1269→                              <ChevronDown className="w-4 h-4 text-white/30" />
+  1270→                            )}
+  1271→                          </div>
+  1272→                        </div>
+  1273→                      </button>
+  1274→                    </CollapsibleTrigger>
+  1275→                    <CollapsibleContent>
+  1276→                      <div className="px-5 pb-5">
+  1277→                        <div className="border-t border-white/5 pt-4">
+  1278→                          {repo.description && (
+  1279→                            <p className="text-sm text-white/50 leading-relaxed mb-4">{repo.description}</p>
+  1280→                          )}
+  1281→                          {repo.homepage && (
+  1282→                            <a
+  1283→                              href={repo.homepage}
+  1284→                              target="_blank"
+  1285→                              rel="noopener noreferrer"
+  1286→                              className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors mb-3"
+  1287→                            >
+  1288→                              <Globe className="w-3 h-3" />
+  1289→                              {repo.homepage.replace(/^https?:\/\//, '')}
+  1290→                            </a>
+  1291→                          )}
+  1292→                          <div className="flex items-center gap-4 text-xs text-white/30">
+  1293→                            {repo.size && <span>{(repo.size / 1024).toFixed(1)} MB</span>}
+  1294→                            <a
+  1295→                              href={repo.url}
+  1296→                              target="_blank"
+  1297→                              rel="noopener noreferrer"
+  1298→                              className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
+  1299→                            >
+  1300→                              <Github className="w-3 h-3" />
+  1301→                              View on GitHub
+  1302→                              <ExternalLink className="w-3 h-3" />
+  1303→                            </a>
+  1304→                          </div>
+  1305→                        </div>
+  1306→                      </div>
+  1307→                    </CollapsibleContent>
+  1308→                  </Collapsible>
+  1309→                </Card>
+  1310→              </motion.div>
+  1311→            ))}
+  1312→          </div>
+  1313→        )}
+  1314→      </motion.div>
+  1315→    </motion.div>
+  1316→  );
+  1317→}
+  1318→
+  1319→// ==================== Status View ====================
+  1320→function StatusView() {
+  1321→  const { services, loading } = useServices();
+  1322→
+  1323→  const operationalCount = services.filter((s) => s.status === 'operational').length;
+  1324→  const totalCount = services.length;
+  1325→  const allOperational = totalCount > 0 && operationalCount === totalCount;
+  1326→
+  1327→  return (
+  1328→    <motion.div
+  1329→      initial={{ opacity: 0 }}
+  1330→      animate={{ opacity: 1 }}
+  1331→      exit={{ opacity: 0 }}
+  1332→      transition={{ duration: 0.3 }}
+  1333→      className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20"
+  1334→    >
+  1335→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+  1336→        <div className="text-center mb-12">
+  1337→          <motion.div
+  1338→            initial={{ scale: 0 }}
+  1339→            animate={{ scale: 1 }}
+  1340→            transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+  1341→            className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center"
+  1342→          >
+  1343→            {allOperational ? (
+  1344→              <div className="w-16 h-16 rounded-full bg-green-400/10 border-2 border-green-400/30 flex items-center justify-center">
+  1345→                <Activity className="w-8 h-8 text-green-400" />
+  1346→              </div>
+  1347→            ) : (
+  1348→              <div className="w-16 h-16 rounded-full bg-yellow-400/10 border-2 border-yellow-400/30 flex items-center justify-center">
+  1349→                <AlertCircle className="w-8 h-8 text-yellow-400" />
+  1350→              </div>
+  1351→            )}
+  1352→          </motion.div>
+  1353→          <h1 className="text-3xl sm:text-4xl font-bold mb-2">حالة الخدمات</h1>
+  1354→          <p className="text-white/40 text-sm">
+  1355→            {loading ? 'جاري التحميل...' : allOperational ? 'جميع الخدمات تعمل بشكل طبيعي' : `تعرض ${totalCount - operationalCount} خدمة لمشاكل`}
+  1356→          </p>
+  1357→        </div>
+  1358→
+  1359→        {loading ? (
+  1360→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1361→            {Array.from({ length: 6 }).map((_, i) => (
+  1362→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-5 w-32 bg-white/10 mb-3" /><Skeleton className="h-4 w-full bg-white/10" /></CardContent></Card>
+  1363→            ))}
+  1364→          </div>
+  1365→        ) : services.length === 0 ? (
+  1366→          <div className="text-center py-20">
+  1367→            <Activity className="w-16 h-16 text-white/10 mx-auto mb-4" />
+  1368→            <p className="text-white/30">لا توجد خدمات مسجلة بعد</p>
+  1369→          </div>
+  1370→        ) : (
+  1371→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1372→            {services.map((service, i) => (
+  1373→              <StatusCard key={service.id} service={service} index={i} />
+  1374→            ))}
+  1375→          </div>
+  1376→        )}
+  1377→      </motion.div>
+  1378→    </motion.div>
+  1379→  );
+  1380→}
+  1381→
+  1382→// ==================== Ideas View ====================
+  1383→function IdeasView() {
+  1384→  const { data: session } = useSession();
+  1385→  const { ideas, loading, submitIdea, voteIdea } = useIdeas();
+  1386→  const [title, setTitle] = useState('');
+  1387→  const [content, setContent] = useState('');
+  1388→  const [submitting, setSubmitting] = useState(false);
+  1389→  const [submitError, setSubmitError] = useState('');
+  1390→  const [submitSuccess, setSubmitSuccess] = useState(false);
+  1391→  const [showForm, setShowForm] = useState(false);
+  1392→
+  1393→  const handleSubmit = async () => {
+  1394→    if (!title.trim() || !content.trim()) return;
+  1395→    setSubmitting(true);
+  1396→    setSubmitError('');
+  1397→    try {
+  1398→      await submitIdea(title.trim(), content.trim());
+  1399→      setTitle('');
+  1400→      setContent('');
+  1401→      setShowForm(false);
+  1402→      setSubmitSuccess(true);
+  1403→      setTimeout(() => setSubmitSuccess(false), 3000);
+  1404→    } catch (err: any) {
+  1405→      setSubmitError(err.message || 'Failed to submit idea');
+  1406→    } finally {
+  1407→      setSubmitting(false);
+  1408→    }
+  1409→  };
+  1410→
+  1411→  return (
+  1412→    <motion.div
+  1413→      initial={{ opacity: 0 }}
+  1414→      animate={{ opacity: 1 }}
+  1415→      exit={{ opacity: 0 }}
+  1416→      transition={{ duration: 0.3 }}
+  1417→      className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-20"
+  1418→    >
+  1419→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+  1420→        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
+  1421→          <div>
+  1422→            <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+  1423→              <Lightbulb className="w-8 h-8 text-white/40" />
+  1424→              لوحة الأفكار
+  1425→            </h1>
+  1426→            <p className="text-white/40 text-sm mt-2">شارك أفكارك وصوّت على الأفكار الأخرى</p>
+  1427→          </div>
+  1428→          <Button
+  1429→            onClick={() => setShowForm(!showForm)}
+  1430→            variant={showForm ? 'ghost' : 'default'}
+  1431→            size="sm"
+  1432→            className={showForm ? 'text-white/60 hover:text-white hover:bg-white/5' : 'bg-white text-black hover:bg-white/90 font-medium'}
+  1433→          >
+  1434→            {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+  1435→            {showForm ? 'إلغاء' : 'فكرة جديدة'}
+  1436→          </Button>
+  1437→        </div>
+  1438→
+  1439→        {/* Submit Form */}
+  1440→        <AnimatePresence>
+  1441→          {showForm && (
+  1442→            <motion.div
+  1443→              initial={{ opacity: 0, height: 0 }}
+  1444→              animate={{ opacity: 1, height: 'auto' }}
+  1445→              exit={{ opacity: 0, height: 0 }}
+  1446→              className="overflow-hidden mb-8"
+  1447→            >
+  1448→              <Card className="bg-white/[0.03] border-white/10">
+  1449→                <CardContent className="p-5 space-y-3">
+  1450→                  {session ? (
+  1451→                    <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
+  1452→                      <span>نشر كـ</span>
+  1453→                      <span className="text-white/60">{session.user?.name || 'User'}</span>
+  1454→                    </div>
+  1455→                  ) : (
+  1456→                    <div className="flex items-center gap-2 text-xs text-yellow-500/60 mb-2">
+  1457→                      <AlertCircle className="w-3 h-3" />
+  1458→                      <span>أنت تنشر بدون تسجيل دخول</span>
+  1459→                    </div>
+  1460→                  )}
+  1461→                  <Input
+  1462→                    value={title}
+  1463→                    onChange={(e) => setTitle(e.target.value)}
+  1464→                    placeholder="عنوان الفكرة..."
+  1465→                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+  1466→                    maxLength={100}
+  1467→                  />
+  1468→                  <Textarea
+  1469→                    value={content}
+  1470→                    onChange={(e) => setContent(e.target.value)}
+  1471→                    placeholder="وصف الفكرة بالتفصيل..."
+  1472→                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none min-h-[100px]"
+  1473→                    maxLength={1000}
+  1474→                  />
+  1475→                  <div className="flex items-center justify-between">
+  1476→                    <div className="flex items-center gap-2">
+  1477→                      {submitError && <span className="text-xs text-red-400">{submitError}</span>}
+  1478→                      {submitSuccess && <span className="text-xs text-green-400">تم إرسال الفكرة بنجاح! بانتظار الموافقة.</span>}
+  1479→                      <span className="text-xs text-white/20">{content.length}/1000</span>
+  1480→                    </div>
+  1481→                    <Button
+  1482→                      onClick={handleSubmit}
+  1483→                      disabled={submitting || !title.trim() || !content.trim()}
+  1484→                      size="sm"
+  1485→                      className="bg-white text-black hover:bg-white/90 font-medium"
+  1486→                    >
+  1487→                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+  1488→                      إرسال
+  1489→                    </Button>
+  1490→                  </div>
+  1491→                </CardContent>
+  1492→              </Card>
+  1493→            </motion.div>
+  1494→          )}
+  1495→        </AnimatePresence>
+  1496→
+  1497→        {/* Ideas List */}
+  1498→        {loading ? (
+  1499→          <div className="space-y-3">
+  1500→            {Array.from({ length: 3 }).map((_, i) => (
+  1501→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-5 w-48 bg-white/10 mb-3" /><Skeleton className="h-4 w-full bg-white/10" /></CardContent></Card>
+  1502→            ))}
+  1503→          </div>
+  1504→        ) : ideas.length === 0 ? (
+  1505→          <div className="text-center py-20">
+  1506→            <Lightbulb className="w-16 h-16 text-white/10 mx-auto mb-4" />
+  1507→            <p className="text-white/30 mb-2">لا توجد أفكار بعد</p>
+  1508→            <p className="text-white/20 text-sm">كن أول من يشارك فكرة!</p>
+  1509→          </div>
+  1510→        ) : (
+  1511→          <div className="space-y-3">
+  1512→            <AnimatePresence>
+  1513→              {ideas.map((idea, i) => (
+  1514→                <motion.div
+  1515→                  key={idea.id}
+  1516→                  initial={{ opacity: 0, y: 10 }}
+  1517→                  animate={{ opacity: 1, y: 0 }}
+  1518→                  transition={{ delay: i * 0.03, duration: 0.3 }}
+  1519→                >
+  1520→                  <IdeaCard idea={idea} onVote={voteIdea} />
+  1521→                </motion.div>
+  1522→              ))}
+  1523→            </AnimatePresence>
+  1524→          </div>
+  1525→        )}
+  1526→      </motion.div>
+  1527→    </motion.div>
+  1528→  );
+  1529→}
+  1530→
+  1531→// ==================== Servers View (Admin Only) ====================
+  1532→function ServersView() {
+  1533→  const [servers, setServers] = useState<DiscordServerData[]>([]);
+  1534→  const [inviteUrl, setInviteUrl] = useState('');
+  1535→  const [adding, setAdding] = useState(false);
+  1536→  const [addError, setAddError] = useState('');
+  1537→  const [loading, setLoading] = useState(true);
+  1538→
+  1539→  const fetchServers = useCallback(() => {
+  1540→    fetch('/api/servers')
+  1541→      .then((res) => res.json())
+  1542→      .then((data) => setServers(data.servers || []))
+  1543→      .catch(console.error)
+  1544→      .finally(() => setLoading(false));
+  1545→  }, []);
+  1546→
+  1547→  useEffect(() => {
+  1548→    fetchServers();
+  1549→  }, [fetchServers]);
+  1550→
+  1551→  const handleAddServer = async () => {
+  1552→    if (!inviteUrl.trim()) return;
+  1553→    setAdding(true);
+  1554→    setAddError('');
+  1555→    try {
+  1556→      const res = await fetch('/api/servers', {
+  1557→        method: 'POST',
+  1558→        headers: { 'Content-Type': 'application/json' },
+  1559→        body: JSON.stringify({ inviteUrl: inviteUrl.trim() }),
+  1560→      });
+  1561→      const data = await res.json();
+  1562→      if (!res.ok) {
+  1563→        setAddError(data.error || 'فشل إضافة السيرفر');
+  1564→        return;
+  1565→      }
+  1566→      setInviteUrl('');
+  1567→      fetchServers();
+  1568→    } catch {
+  1569→      setAddError('فشل الاتصال بالخادم');
+  1570→    } finally {
+  1571→      setAdding(false);
+  1572→    }
+  1573→  };
+  1574→
+  1575→  const handleDeleteServer = async (serverId: string) => {
+  1576→    try {
+  1577→      await fetch('/api/servers', {
+  1578→        method: 'DELETE',
+  1579→        headers: { 'Content-Type': 'application/json' },
+  1580→        body: JSON.stringify({ serverId }),
+  1581→      });
+  1582→      fetchServers();
+  1583→    } catch {
+  1584→      // silent
+  1585→    }
+  1586→  };
+  1587→
+  1588→  const getServerIcon = (server: DiscordServerData) => {
+  1589→    if (server.icon) {
+  1590→      return `https://cdn.discordapp.com/icons/${server.serverId}/${server.icon}.png`;
+  1591→    }
+  1592→    return null;
+  1593→  };
+  1594→
+  1595→  const getServerBanner = (server: DiscordServerData) => {
+  1596→    if (server.banner) {
+  1597→      return `https://cdn.discordapp.com/banners/${server.serverId}/${server.banner}.png`;
+  1598→    }
+  1599→    return null;
+  1600→  };
+  1601→
+  1602→  return (
+  1603→    <motion.div
+  1604→      initial={{ opacity: 0 }}
+  1605→      animate={{ opacity: 1 }}
+  1606→      exit={{ opacity: 0 }}
+  1607→      transition={{ duration: 0.3 }}
+  1608→      className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20"
+  1609→    >
+  1610→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+  1611→        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
+  1612→          <div>
+  1613→            <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+  1614→              <Server className="w-8 h-8 text-white/40" />
+  1615→              سيرفرات ديسكورد
+  1616→            </h1>
+  1617→            <p className="text-white/40 text-sm mt-2">إدارة السيرفرات عبر روابط الدعوة</p>
+  1618→          </div>
+  1619→          <Badge variant="secondary" className="bg-white/10 text-white/60 border-white/10">{servers.length} سيرفر</Badge>
+  1620→        </div>
+  1621→
+  1622→        {/* Add Server */}
+  1623→        <Card className="bg-white/[0.03] border-white/10 mb-8">
+  1624→          <CardContent className="p-5">
+  1625→            <div className="flex flex-col sm:flex-row gap-3">
+  1626→              <div className="flex-1 relative">
+  1627→                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+  1628→                <Input
+  1629→                  value={inviteUrl}
+  1630→                  onChange={(e) => setInviteUrl(e.target.value)}
+  1631→                  placeholder="discord.gg/..."
+  1632→                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 pl-9"
+  1633→                  onKeyDown={(e) => e.key === 'Enter' && handleAddServer()}
+  1634→                />
+  1635→              </div>
+  1636→              <Button onClick={handleAddServer} disabled={adding || !inviteUrl.trim()} size="default" className="bg-white text-black hover:bg-white/90 font-medium w-full sm:w-auto">
+  1637→                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+  1638→                إضافة سيرفر
+  1639→              </Button>
+  1640→            </div>
+  1641→            {addError && <div className="flex items-center gap-2 text-xs text-red-400 mt-2"><AlertCircle className="w-3 h-3" /><span>{addError}</span></div>}
+  1642→          </CardContent>
+  1643→        </Card>
+  1644→
+  1645→        {/* Servers Grid */}
+  1646→        {loading ? (
+  1647→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1648→            {Array.from({ length: 3 }).map((_, i) => (
+  1649→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-20 w-20 mx-auto rounded-xl bg-white/10 mb-4" /><Skeleton className="h-5 w-32 mx-auto bg-white/10 mb-2" /><Skeleton className="h-4 w-24 mx-auto bg-white/10" /></CardContent></Card>
+  1650→            ))}
+  1651→          </div>
+  1652→        ) : servers.length === 0 ? (
+  1653→          <div className="text-center py-20">
+  1654→            <Server className="w-16 h-16 text-white/10 mx-auto mb-4" />
+  1655→            <p className="text-white/30">لا توجد سيرفرات بعد. أضف سيرفر باستخدام رابط الدعوة!</p>
+  1656→          </div>
+  1657→        ) : (
+  1658→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1659→            <AnimatePresence>
+  1660→              {servers.map((server, i) => {
+  1661→                const iconUrl = getServerIcon(server);
+  1662→                const bannerUrl = getServerBanner(server);
+  1663→                return (
+  1664→                  <motion.div
+  1665→                    key={server.id}
+  1666→                    initial={{ opacity: 0, y: 20 }}
+  1667→                    animate={{ opacity: 1, y: 0 }}
+  1668→                    exit={{ opacity: 0, scale: 0.9 }}
+  1669→                    transition={{ delay: i * 0.05, duration: 0.4 }}
+  1670→                    layout
+  1671→                  >
+  1672→                    <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300 overflow-hidden group relative">
+  1673→                      {bannerUrl && (
+  1674→                        <div className="w-full h-24 relative overflow-hidden">
+  1675→                          <img src={bannerUrl} alt="" className="w-full h-full object-cover" />
+  1676→                          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80" />
+  1677→                        </div>
+  1678→                      )}
+  1679→                      <CardContent className="p-5 relative">
+  1680→                        <Button
+  1681→                          variant="ghost"
+  1682→                          size="sm"
+  1683→                          onClick={() => handleDeleteServer(server.id)}
+  1684→                          className="absolute top-3 right-3 text-white/20 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 p-0"
+  1685→                        >
+  1686→                          <Trash2 className="w-3.5 h-3.5" />
+  1687→                        </Button>
+  1688→
+  1689→                        <div className="flex flex-col items-center text-center">
+  1690→                          <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 mb-3 bg-white/5 -mt-6 relative z-10 shadow-lg">
+  1691→                            {iconUrl ? (
+  1692→                              <img src={iconUrl} alt={server.name} className="w-full h-full object-cover" />
+  1693→                            ) : (
+  1694→                              <div className="w-full h-full flex items-center justify-center">
+  1695→                                <Server className="w-8 h-8 text-white/30" />
+  1696→                              </div>
+  1697→                            )}
+  1698→                          </div>
+  1699→                          <h3 className="font-bold text-sm text-white/90 mb-2">{server.name}</h3>
+  1700→
+  1701→                          {server.description && (
+  1702→                            <p className="text-[11px] text-white/40 mb-3 line-clamp-2 leading-relaxed">{server.description}</p>
+  1703→                          )}
+  1704→
+  1705→                          <div className="w-full grid grid-cols-2 gap-2 mt-auto">
+  1706→                            <div className="flex items-center gap-1.5 justify-center p-2 rounded-lg bg-white/[0.03]">
+  1707→                              <Users className="w-3.5 h-3.5 text-white/40" />
+  1708→                              <span className="text-xs text-white/60">{server.memberCount.toLocaleString()}</span>
+  1709→                            </div>
+  1710→                            <div className="flex items-center gap-1.5 justify-center p-2 rounded-lg bg-white/[0.03]">
+  1711→                              <UserCheck className="w-3.5 h-3.5 text-green-400/60" />
+  1712→                              <span className="text-xs text-white/60">{server.onlineCount.toLocaleString()}</span>
+  1713→                            </div>
+  1714→                          </div>
+  1715→
+  1716→                          {server.channelName && (
+  1717→                            <div className="flex items-center gap-1.5 mt-2 text-white/30">
+  1718→                              <Hash className="w-3 h-3" />
+  1719→                              <span className="text-[11px]">#{server.channelName}</span>
+  1720→                            </div>
+  1721→                          )}
+  1722→                        </div>
+  1723→                      </CardContent>
+  1724→                    </Card>
+  1725→                  </motion.div>
+  1726→                );
+  1727→              })}
+  1728→            </AnimatePresence>
+  1729→          </div>
+  1730→        )}
+  1731→      </motion.div>
+  1732→    </motion.div>
+  1733→  );
+  1734→}
+  1735→
+  1736→// ==================== Admin View (Admin Only) ====================
+  1737→function AdminView() {
+  1738→  const [stats, setStats] = useState<AdminStats | null>(null);
+  1739→  const [users, setUsers] = useState<any[]>([]);
+  1740→  const [comments, setComments] = useState<any[]>([]);
+  1741→  const [servers, setServers] = useState<DiscordServerData[]>([]);
+  1742→  const [loading, setLoading] = useState(true);
+  1743→  const [activeTab, setActiveTab] = useState('overview');
+  1744→
+  1745→  const fetchAdminData = useCallback(() => {
+  1746→    setLoading(true);
+  1747→    fetch('/api/admin')
+  1748→      .then((res) => res.json())
+  1749→      .then((data) => {
+  1750→        setStats(data.stats);
+  1751→        setUsers(data.users || []);
+  1752→        setComments(data.comments || []);
+  1753→        setServers(data.servers || []);
+  1754→      })
+  1755→      .catch(console.error)
+  1756→      .finally(() => setLoading(false));
+  1757→  }, []);
+  1758→
+  1759→  useEffect(() => {
+  1760→    fetchAdminData();
+  1761→  }, [fetchAdminData]);
+  1762→
+  1763→  const handleDelete = async (type: string, id: string) => {
+  1764→    await fetch('/api/admin', {
+  1765→      method: 'DELETE',
+  1766→      headers: { 'Content-Type': 'application/json' },
+  1767→      body: JSON.stringify({ type, id }),
+  1768→    });
+  1769→    fetchAdminData();
+  1770→  };
+  1771→
+  1772→  const timeAgo = (dateStr: string) => {
+  1773→    const diff = Date.now() - new Date(dateStr).getTime();
+  1774→    const minutes = Math.floor(diff / 60000);
+  1775→    const hours = Math.floor(diff / 3600000);
+  1776→    const days = Math.floor(diff / 86400000);
+  1777→    if (minutes < 1) return 'الآن';
+  1778→    if (minutes < 60) return `${minutes}د`;
+  1779→    if (hours < 24) return `${hours}س`;
+  1780→    return `${days}ي`;
+  1781→  };
+  1782→
+  1783→  return (
+  1784→    <motion.div
+  1785→      initial={{ opacity: 0 }}
+  1786→      animate={{ opacity: 1 }}
+  1787→      exit={{ opacity: 0 }}
+  1788→      transition={{ duration: 0.3 }}
+  1789→      className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20"
+  1790→    >
+  1791→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+  1792→        <div className="flex items-center justify-between mb-10">
+  1793→          <div>
+  1794→            <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+  1795→              <Settings className="w-8 h-8 text-white/40" />
+  1796→              لوحة الإدارة
+  1797→            </h1>
+  1798→            <p className="text-white/40 text-sm mt-2">إدارة كاملة للموقع</p>
+  1799→          </div>
+  1800→          <Button variant="ghost" size="sm" onClick={fetchAdminData} className="text-white/50 hover:text-white hover:bg-white/5">
+  1801→            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+  1802→          </Button>
+  1803→        </div>
+  1804→
+  1805→        {loading ? (
+  1806→          <div className="space-y-4">
+  1807→            {Array.from({ length: 4 }).map((_, i) => (
+  1808→              <Card key={i} className="bg-white/[0.03] border-white/10"><CardContent className="p-5"><Skeleton className="h-20 bg-white/10" /></CardContent></Card>
+  1809→            ))}
+  1810→          </div>
+  1811→        ) : (
+  1812→          <>
+  1813→            {/* Stats */}
+  1814→            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+  1815→              <StatCard icon={<Users className="w-5 h-5" />} label="المستخدمين" value={stats?.totalUsers || 0} />
+  1816→              <StatCard icon={<MessageSquare className="w-5 h-5" />} label="التعليقات" value={stats?.totalComments || 0} />
+  1817→              <StatCard icon={<Server className="w-5 h-5" />} label="السيرفرات" value={stats?.totalServers || 0} />
+  1818→              <StatCard icon={<BarChart3 className="w-5 h-5" />} label="تقييدات" value={stats?.totalRateLimits || 0} />
+  1819→            </div>
+  1820→
+  1821→            {/* Tabs */}
+  1822→            <Tabs value={activeTab} onValueChange={setActiveTab}>
+  1823→              <TabsList className="bg-white/5 border border-white/10 mb-6">
+  1824→                <TabsTrigger value="overview" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+  1825→                  نظرة عامة
+  1826→                </TabsTrigger>
+  1827→                <TabsTrigger value="users" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+  1828→                  المستخدمين
+  1829→                </TabsTrigger>
+  1830→                <TabsTrigger value="comments" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+  1831→                  التعليقات
+  1832→                </TabsTrigger>
+  1833→                <TabsTrigger value="servers" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+  1834→                  السيرفرات
+  1835→                </TabsTrigger>
+  1836→              </TabsList>
+  1837→
+  1838→              <TabsContent value="overview">
+  1839→                <div className="space-y-4">
+  1840→                  <Card className="bg-white/[0.03] border-white/10">
+  1841→                    <CardHeader className="pb-2"><h3 className="text-sm font-semibold text-white/70">آخر المستخدمين</h3></CardHeader>
+  1842→                    <CardContent>
+  1843→                      <div className="space-y-2">
+  1844→                        {users.slice(0, 5).map((u) => (
+  1845→                          <div key={u.id} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
+  1846→                            <div className="flex items-center gap-2">
+  1847→                              <Avatar className="w-7 h-7"><AvatarImage src={u.avatar ? `https://cdn.discordapp.com/avatars/${u.discordId}/${u.avatar}.png` : undefined} /><AvatarFallback className="bg-white/10 text-white text-[10px]"><User className="w-3 h-3" /></AvatarFallback></Avatar>
+  1848→                              <div>
+  1849→                                <span className="text-sm text-white/80">{u.username}</span>
+  1850→                                <span className="text-[10px] text-white/30 ml-1">{timeAgo(u.createdAt)}</span>
+  1851→                              </div>
+  1852→                            </div>
+  1853→                            <span className="text-[10px] text-white/30">{u._count?.comments || 0} تعليق</span>
+  1854→                          </div>
+  1855→                        ))}
+  1856→                      </div>
+  1857→                    </CardContent>
+  1858→                  </Card>
+  1859→
+  1860→                  <Card className="bg-white/[0.03] border-white/10">
+  1861→                    <CardHeader className="pb-2"><h3 className="text-sm font-semibold text-white/70">آخر التعليقات</h3></CardHeader>
+  1862→                    <CardContent>
+  1863→                      <div className="space-y-2">
+  1864→                        {comments.slice(0, 5).map((c) => (
+  1865→                          <div key={c.id} className="flex items-start justify-between gap-3 p-2 rounded-lg bg-white/[0.02]">
+  1866→                            <div className="min-w-0 flex-1">
+  1867→                              <div className="flex items-center gap-2 mb-1">
+  1868→                                <span className="text-xs font-medium text-white/70">{c.user?.username}</span>
+  1869→                                <span className="text-[10px] text-white/30">{timeAgo(c.createdAt)}</span>
+  1870→                              </div>
+  1871→                              <p className="text-xs text-white/50 truncate">{c.content}</p>
+  1872→                            </div>
+  1873→                            <Button variant="ghost" size="sm" onClick={() => handleDelete('comment', c.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 flex-shrink-0 w-7 h-7 p-0">
+  1874→                              <Trash2 className="w-3 h-3" />
+  1875→                            </Button>
+  1876→                          </div>
+  1877→                        ))}
+  1878→                      </div>
+  1879→                    </CardContent>
+  1880→                  </Card>
+  1881→                </div>
+  1882→              </TabsContent>
+  1883→
+  1884→              <TabsContent value="users">
+  1885→                <div className="space-y-2">
+  1886→                  {users.map((u) => (
+  1887→                    <Card key={u.id} className="bg-white/[0.03] border-white/10">
+  1888→                      <CardContent className="p-4 flex items-center justify-between">
+  1889→                        <div className="flex items-center gap-3">
+  1890→                          <Avatar className="w-8 h-8"><AvatarImage src={u.avatar ? `https://cdn.discordapp.com/avatars/${u.discordId}/${u.avatar}.png` : undefined} /><AvatarFallback className="bg-white/10 text-white text-xs"><User className="w-3 h-3" /></AvatarFallback></Avatar>
+  1891→                          <div>
+  1892→                            <div className="text-sm text-white/80">{u.username}</div>
+  1893→                            <div className="text-[10px] text-white/30">ID: {u.discordId} • {timeAgo(u.createdAt)}</div>
+  1894→                          </div>
+  1895→                        </div>
+  1896→                        <div className="flex items-center gap-2">
+  1897→                          <Badge variant="secondary" className="bg-white/5 text-white/40 border-white/10">{u._count?.comments || 0} تعليق</Badge>
+  1898→                          <Button variant="ghost" size="sm" onClick={() => handleDelete('user', u.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 w-8 h-8 p-0"><Trash2 className="w-3.5 h-3.5" /></Button>
+  1899→                        </div>
+  1900→                      </CardContent>
+  1901→                    </Card>
+  1902→                  ))}
+  1903→                  {users.length === 0 && <p className="text-white/30 text-center py-12">لا يوجد مستخدمين بعد</p>}
+  1904→                </div>
+  1905→              </TabsContent>
+  1906→
+  1907→              <TabsContent value="comments">
+  1908→                <div className="space-y-2">
+  1909→                  {comments.map((c) => (
+  1910→                    <Card key={c.id} className="bg-white/[0.03] border-white/10">
+  1911→                      <CardContent className="p-4">
+  1912→                        <div className="flex items-start justify-between gap-3">
+  1913→                          <div className="min-w-0 flex-1">
+  1914→                            <div className="flex items-center gap-2 mb-1">
+  1915→                              <Avatar className="w-6 h-6"><AvatarImage src={c.user?.avatar ? `https://cdn.discordapp.com/avatars/${c.user?.discordId}/${c.user.avatar}.png` : undefined} /><AvatarFallback className="bg-white/10 text-white text-[10px]"><User className="w-2.5 h-2.5" /></AvatarFallback></Avatar>
+  1916→                              <span className="text-xs font-medium text-white/70">{c.user?.username}</span>
+  1917→                              <span className="text-[10px] text-white/30">{timeAgo(c.createdAt)}</span>
+  1918→                            </div>
+  1919→                            <p className="text-sm text-white/50 leading-relaxed">{c.content}</p>
+  1920→                          </div>
+  1921→                          <Button variant="ghost" size="sm" onClick={() => handleDelete('comment', c.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 flex-shrink-0 w-8 h-8 p-0"><Trash2 className="w-3.5 h-3.5" /></Button>
+  1922→                        </div>
+  1923→                      </CardContent>
+  1924→                    </Card>
+  1925→                  ))}
+  1926→                  {comments.length === 0 && <p className="text-white/30 text-center py-12">لا يوجد تعليقات بعد</p>}
+  1927→                </div>
+  1928→              </TabsContent>
+  1929→
+  1930→              <TabsContent value="servers">
+  1931→                <div className="space-y-2">
+  1932→                  {servers.map((s) => {
+  1933→                    const iconUrl = s.icon ? `https://cdn.discordapp.com/icons/${s.serverId}/${s.icon}.png` : null;
+  1934→                    return (
+  1935→                      <Card key={s.id} className="bg-white/[0.03] border-white/10">
+  1936→                        <CardContent className="p-4 flex items-center justify-between">
+  1937→                          <div className="flex items-center gap-3">
+  1938→                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+  1939→                              {iconUrl ? <img src={iconUrl} alt={s.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Server className="w-5 h-5 text-white/30" /></div>}
+  1940→                            </div>
+  1941→                            <div>
+  1942→                              <div className="text-sm text-white/80">{s.name}</div>
+  1943→                              <div className="text-[10px] text-white/30">{s.memberCount.toLocaleString()} عضو • {s.onlineCount.toLocaleString()} أونلاين • {timeAgo(s.createdAt)}</div>
+  1944→                            </div>
+  1945→                          </div>
+  1946→                          <Button variant="ghost" size="sm" onClick={() => handleDelete('server', s.id)} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 w-8 h-8 p-0"><Trash2 className="w-3.5 h-3.5" /></Button>
+  1947→                        </CardContent>
+  1948→                      </Card>
+  1949→                    );
+  1950→                  })}
+  1951→                  {servers.length === 0 && <p className="text-white/30 text-center py-12">لا يوجد سيرفرات بعد</p>}
+  1952→                </div>
+  1953→              </TabsContent>
+  1954→            </Tabs>
+  1955→          </>
+  1956→        )}
+  1957→      </motion.div>
+  1958→    </motion.div>
+  1959→  );
+  1960→}
+  1961→
+  1962→export default AppContent;
+  1963→

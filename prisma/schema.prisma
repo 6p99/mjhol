@@ -53,7 +53,46 @@ model DiscordServer {
   onlineCount Int      @default(0)
   channelId   String?
   channelName String?
-  addedBy     String   // discord id of who added
+  addedBy     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model VisitorCount {
+  id    String @id @default(cuid())
+  count Int    @default(0)
+}
+
+model Idea {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  votes     Int      @default(0)
+  userId    String?
+  ipHash    String?
+  status    String   @default("pending") // pending, approved, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServiceStatus {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("operational") // operational, degraded, down, maintenance
+  icon        String?
+  url         String?
+  uptime      Float    @default(99.9)
+  lastChecked DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Skill {
+  id        String  @id @default(cuid())
+  name      String
+  level     Int     @default(50)
+  icon      String?
+  category  String?
+  sortOrder Int     @default(0)
 }
