@@ -30,13 +30,30 @@ model Comment {
   userAgent String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  // For rate limiting tracking
 }
 
 model RateLimit {
   id        String   @id @default(cuid())
-  userId    String?  // Discord user id if logged in
-  ipHash    String?  // IP hash for anonymous
+  userId    String?
+  ipHash    String?
   lastCommentAt DateTime @default(now())
   createdAt DateTime @default(now())
+}
+
+model DiscordServer {
+  id          String   @id @default(cuid())
+  inviteCode  String   @unique
+  serverId    String
+  name        String
+  icon        String?
+  splash      String?
+  banner      String?
+  description String?
+  memberCount Int      @default(0)
+  onlineCount Int      @default(0)
+  channelId   String?
+  channelName String?
+  addedBy     String   // discord id of who added
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

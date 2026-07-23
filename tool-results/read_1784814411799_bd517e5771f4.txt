@@ -1,0 +1,771 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { SessionProvider, useSession } from 'next-auth/react';
+     6→import {
+     7→  Github,
+     8→  ExternalLink,
+     9→  MessageSquare,
+    10→  Send,
+    11→  LogIn,
+    12→  LogOut,
+    13→  Shield,
+    14→  Lock,
+    15→  Eye,
+    16→  Clock,
+    17→  Star,
+    18→  GitFork,
+    19→  BookOpen,
+    20→  Code2,
+    21→  Terminal,
+    22→  ChevronDown,
+    23→  ChevronUp,
+    24→  Loader2,
+    25→  AlertCircle,
+    26→  User,
+    27→  Trash2,
+    28→} from 'lucide-react';
+    29→import { Button } from '@/components/ui/button';
+    30→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    31→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+    32→import { Badge } from '@/components/ui/badge';
+    33→import { Textarea } from '@/components/ui/textarea';
+    34→import { Separator } from '@/components/ui/separator';
+    35→import { Skeleton } from '@/components/ui/skeleton';
+    36→import { Input } from '@/components/ui/input';
+    37→import {
+    38→  Dialog,
+    39→  DialogContent,
+    40→  DialogHeader,
+    41→  DialogTitle,
+    42→  DialogDescription,
+    43→} from '@/components/ui/dialog';
+    44→
+    45→// Types
+    46→interface GithubProfile {
+    47→  login: string;
+    48→  name: string;
+    49→  bio: string;
+    50→  avatarUrl: string;
+    51→  githubUrl: string;
+    52→  publicRepos: number;
+    53→  followers: number;
+    54→  following: number;
+    55→  createdAt: string;
+    56→}
+    57→
+    58→interface GithubRepo {
+    59→  name: string;
+    60→  language: string | null;
+    61→  stars: number;
+    62→  forks: number;
+    63→  url: string;
+    64→  description: string | null;
+    65→  color: string | null;
+    66→}
+    67→
+    68→interface Comment {
+    69→  id: string;
+    70→  content: string;
+    71→  username: string;
+    72→  discriminator: string | null;
+    73→  avatar: string | null;
+    74→  createdAt: string;
+    75→}
+    76→
+    77→// ==================== Data Fetching Hook ====================
+    78→function getInitialGithubData(): { profile: GithubProfile | null; repos: GithubRepo[]; loading: boolean } {
+    79→  if (typeof window === 'undefined') {
+    80→    return { profile: null, repos: [], loading: true };
+    81→  }
+    82→  try {
+    83→    const cached = sessionStorage.getItem('github-data');
+    84→    if (cached) {
+    85→      const data = JSON.parse(cached);
+    86→      return { profile: data.profile, repos: data.repos, loading: false };
+    87→    }
+    88→  } catch {
+    89→    // ignore
+    90→  }
+    91→  return { profile: null, repos: [], loading: true };
+    92→}
+    93→
+    94→function useGithubData() {
+    95→  const initial = getInitialGithubData();
+    96→  const [profile, setProfile] = useState<GithubProfile | null>(initial.profile);
+    97→  const [repos, setRepos] = useState<GithubRepo[]>(initial.repos);
+    98→  const [loading, setLoading] = useState(initial.loading);
+    99→
+   100→  useEffect(() => {
+   101→    if (!loading) return;
+   102→
+   103→    fetch('/api/github')
+   104→      .then((res) => res.json())
+   105→      .then((data) => {
+   106→        setProfile(data.profile);
+   107→        setRepos(data.repos);
+   108→        sessionStorage.setItem('github-data', JSON.stringify(data));
+   109→      })
+   110→      .catch(console.error)
+   111→      .finally(() => setLoading(false));
+   112→  }, [loading]);
+   113→
+   114→  return { profile, repos, loading };
+   115→}
+   116→
+   117→// ==================== Session Provider Wrapper ====================
+   118→function AppContent() {
+   119→  return (
+   120→    <SessionProvider>
+   121→      <ProfilePage />
+   122→    </SessionProvider>
+   123→  );
+   124→}
+   125→
+   126→// ==================== Main Page ====================
+   127→function ProfilePage() {
+   128→  const { data: session, status } = useSession();
+   129→  const { profile, repos, loading } = useGithubData();
+   130→  const [comments, setComments] = useState<Comment[]>([]);
+   131→  const [newComment, setNewComment] = useState('');
+   132→  const [sending, setSending] = useState(false);
+   133→  const [error, setError] = useState('');
+   134→  const [cooldownInfo, setCooldownInfo] = useState<{ active: boolean; remaining: string } | null>(null);
+   135→  const [showSecurityDialog, setShowSecurityDialog] = useState(false);
+   136→  const [reposExpanded, setReposExpanded] = useState(false);
+   137→
+   138→  // Fetch comments
+   139→  const fetchComments = useCallback(() => {
+   140→    fetch('/api/comments')
+   141→      .then((res) => res.json())
+   142→      .then((data) => setComments(data.comments || []))
+   143→      .catch(console.error);
+   144→  }, []);
+   145→
+   146→  useEffect(() => {
+   147→    fetchComments();
+   148→    // Refresh comments every 30 seconds
+   149→    const interval = setInterval(fetchComments, 30000);
+   150→    return () => clearInterval(interval);
+   151→  }, [fetchComments]);
+   152→
+   153→  // Submit comment
+   154→  const handleSubmitComment = async () => {
+   155→    if (!newComment.trim()) return;
+   156→    setSending(true);
+   157→    setError('');
+   158→
+   159→    try {
+   160→      const res = await fetch('/api/comments', {
+   161→        method: 'POST',
+   162→        headers: { 'Content-Type': 'application/json' },
+   163→        body: JSON.stringify({ content: newComment }),
+   164→      });
+   165→
+   166→      const data = await res.json();
+   167→
+   168→      if (!res.ok) {
+   169→        if (res.status === 401) {
+   170→          setError('يجب تسجيل الدخول عبر ديسكورد أولاً للتعليق');
+   171→        } else if (res.status === 429) {
+   172→          if (data.cooldownRemaining) {
+   173→            const hours = Math.floor(data.cooldownRemaining / 3600000);
+   174→            const minutes = Math.floor((data.cooldownRemaining % 3600000) / 60000);
+   175→            setCooldownInfo({ active: true, remaining: `${hours}س ${minutes}د` });
+   176→          }
+   177→          setError(data.error || 'تم تقييد الطلبات، حاول لاحقاً');
+   178→        } else {
+   179→          setError(data.error || 'حدث خطأ');
+   180→        }
+   181→        return;
+   182→      }
+   183→
+   184→      setNewComment('');
+   185→      setError('');
+   186→      setCooldownInfo(null);
+   187→      fetchComments();
+   188→    } catch {
+   189→      setError('فشل إرسال التعليق');
+   190→    } finally {
+   191→      setSending(false);
+   192→    }
+   193→  };
+   194→
+   195→  // Sign in with Discord
+   196→  const signInDiscord = () => {
+   197→    window.location.href = `/api/auth/signin/discord?callbackUrl=${encodeURIComponent('/')}`;
+   198→  };
+   199→
+   200→  // Sign out
+   201→  const signOut = () => {
+   202→    window.location.href = '/api/auth/signout?callbackUrl=/';
+   203→  };
+   204→
+   205→  // Format date
+   206→  const formatDate = (dateStr: string) => {
+   207→    return new Date(dateStr).toLocaleDateString('en-US', {
+   208→      year: 'numeric',
+   209→      month: 'long',
+   210→      day: 'numeric',
+   211→    });
+   212→  };
+   213→
+   214→  // Time ago
+   215→  const timeAgo = (dateStr: string) => {
+   216→    const now = new Date();
+   217→    const past = new Date(dateStr);
+   218→    const diff = now.getTime() - past.getTime();
+   219→    const minutes = Math.floor(diff / 60000);
+   220→    const hours = Math.floor(diff / 3600000);
+   221→    const days = Math.floor(diff / 86400000);
+   222→
+   223→    if (minutes < 1) return 'الآن';
+   224→    if (minutes < 60) return `منذ ${minutes} دقيقة`;
+   225→    if (hours < 24) return `منذ ${hours} ساعة`;
+   226→    return `منذ ${days} يوم`;
+   227→  };
+   228→
+   229→  const displayRepos = reposExpanded ? repos : repos.slice(0, 6);
+   230→
+   231→  return (
+   232→    <div className="min-h-screen bg-black text-white flex flex-col">
+   233→      {/* Animated Background */}
+   234→      <div className="fixed inset-0 -z-10 overflow-hidden">
+   235→        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)]" />
+   236→        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,_rgba(255,255,255,0.06)_0%,_transparent_60%)] blur-3xl animate-pulse" />
+   237→        <GridOverlay />
+   238→      </div>
+   239→
+   240→      {/* Header */}
+   241→      <header className="border-b border-white/10 backdrop-blur-md bg-black/50 sticky top-0 z-50">
+   242→        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+   243→          <div className="flex items-center gap-3">
+   244→            <Terminal className="w-5 h-5 text-white/60" />
+   245→            <span className="font-mono text-sm text-white/60">6p99.dev</span>
+   246→          </div>
+   247→          <div className="flex items-center gap-3">
+   248→            <Button
+   249→              variant="ghost"
+   250→              size="sm"
+   251→              onClick={() => setShowSecurityDialog(true)}
+   252→              className="text-white/60 hover:text-white hover:bg-white/5"
+   253→            >
+   254→              <Shield className="w-4 h-4 mr-2" />
+   255→              <span className="hidden sm:inline">الأمان</span>
+   256→            </Button>
+   257→            {status === 'authenticated' && session?.user ? (
+   258→              <div className="flex items-center gap-2">
+   259→                <Avatar className="w-8 h-8 border border-white/20">
+   260→                  <AvatarImage src={session.user.image || undefined} />
+   261→                  <AvatarFallback className="bg-white/10 text-white text-xs">
+   262→                    <User className="w-3 h-3" />
+   263→                  </AvatarFallback>
+   264→                </Avatar>
+   265→                <span className="text-sm text-white/80 hidden sm:inline">
+   266→                  {session.user.name || 'User'}
+   267→                </span>
+   268→                <Button
+   269→                  variant="ghost"
+   270→                  size="sm"
+   271→                  onClick={signOut}
+   272→                  className="text-white/60 hover:text-white hover:bg-white/5"
+   273→                >
+   274→                  <LogOut className="w-4 h-4" />
+   275→                </Button>
+   276→              </div>
+   277→            ) : (
+   278→              <Button
+   279→                onClick={signInDiscord}
+   280→                size="sm"
+   281→                className="bg-white text-black hover:bg-white/90 font-medium"
+   282→              >
+   283→                <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+   284→                  <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286z" />
+   285→                </svg>
+   286→                <span className="hidden sm:inline">دخول ديسكورد</span>
+   287→              </Button>
+   288→            )}
+   289→          </div>
+   290→        </div>
+   291→      </header>
+   292→
+   293→      {/* Main Content */}
+   294→      <main className="flex-1">
+   295→        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+   296→          {/* Hero Section */}
+   297→          <section className="flex flex-col items-center text-center mb-20">
+   298→            <motion.div
+   299→              initial={{ opacity: 0, scale: 0.8 }}
+   300→              animate={{ opacity: 1, scale: 1 }}
+   301→              transition={{ duration: 0.6, ease: 'easeOut' }}
+   302→              className="relative mb-8"
+   303→            >
+   304→              <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-2 border-white/20 shadow-2xl shadow-white/5">
+   305→                {loading ? (
+   306→                  <Skeleton className="w-full h-full bg-white/10" />
+   307→                ) : (
+   308→                  <img
+   309→                    src={profile?.avatarUrl || '/placeholder.png'}
+   310→                    alt={profile?.name || '6p99'}
+   311→                    className="w-full h-full object-cover"
+   312→                  />
+   313→                )}
+   314→              </div>
+   315→              <motion.div
+   316→                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-green-500 border-4 border-black flex items-center justify-center"
+   317→                initial={{ scale: 0 }}
+   318→                animate={{ scale: 1 }}
+   319→                transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
+   320→              >
+   321→                <span className="text-[10px]">●</span>
+   322→              </motion.div>
+   323→            </motion.div>
+   324→
+   325→            <motion.h1
+   326→              initial={{ opacity: 0, y: 20 }}
+   327→              animate={{ opacity: 1, y: 0 }}
+   328→              transition={{ delay: 0.2, duration: 0.5 }}
+   329→              className="text-4xl sm:text-6xl font-bold tracking-tight mb-3"
+   330→            >
+   331→              {loading ? (
+   332→                <Skeleton className="h-12 w-48 mx-auto bg-white/10" />
+   333→              ) : (
+   334→                profile?.name || 'MJHOL'
+   335→              )}
+   336→            </motion.h1>
+   337→
+   338→            <motion.p
+   339→              initial={{ opacity: 0, y: 20 }}
+   340→              animate={{ opacity: 1, y: 0 }}
+   341→              transition={{ delay: 0.3, duration: 0.5 }}
+   342→              className="text-base sm:text-lg text-white/50 max-w-2xl mb-2 font-mono"
+   343→            >
+   344→              @6p99
+   345→            </motion.p>
+   346→
+   347→            <motion.p
+   348→              initial={{ opacity: 0, y: 20 }}
+   349→              animate={{ opacity: 1, y: 0 }}
+   350→              transition={{ delay: 0.4, duration: 0.5 }}
+   351→              className="text-white/40 max-w-xl mb-8 text-sm sm:text-base leading-relaxed"
+   352→            >
+   353→              {loading
+   354→                ? 'I am curious about everything...'
+   355→                : profile?.bio || 'I am curious about everything; I try to understand and program everything—the possible and the impossible.'}
+   356→            </motion.p>
+   357→
+   358→            {/* Stats */}
+   359→            <motion.div
+   360→              initial={{ opacity: 0, y: 20 }}
+   361→              animate={{ opacity: 1, y: 0 }}
+   362→              transition={{ delay: 0.5, duration: 0.5 }}
+   363→              className="flex items-center gap-6 sm:gap-8 mb-8"
+   364→            >
+   365→              <StatBadge icon={<BookOpen className="w-4 h-4" />} value={profile?.publicRepos || 10} label="مستودعات" />
+   366→              <StatBadge icon={<Star className="w-4 h-4" />} value={profile?.followers || 0} label="متابعين" />
+   367→              <StatBadge icon={<Github className="w-4 h-4" />} value={profile?.following || 4} label="يتابع" />
+   368→            </motion.div>
+   369→
+   370→            <motion.div
+   371→              initial={{ opacity: 0, y: 20 }}
+   372→              animate={{ opacity: 1, y: 0 }}
+   373→              transition={{ delay: 0.6, duration: 0.5 }}
+   374→              className="flex items-center gap-4"
+   375→            >
+   376→              <a
+   377→                href="https://github.com/6p99"
+   378→                target="_blank"
+   379→                rel="noopener noreferrer"
+   380→                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-all"
+   381→              >
+   382→                <Github className="w-5 h-5" />
+   383→                GitHub
+   384→              </a>
+   385→            </motion.div>
+   386→          </section>
+   387→
+   388→          {/* Repositories Section */}
+   389→          <section className="mb-20">
+   390→            <motion.div
+   391→              initial={{ opacity: 0, y: 20 }}
+   392→              whileInView={{ opacity: 1, y: 0 }}
+   393→              viewport={{ once: true }}
+   394→              transition={{ duration: 0.5 }}
+   395→            >
+   396→              <div className="flex items-center justify-between mb-8">
+   397→                <div>
+   398→                  <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+   399→                    <Code2 className="w-7 h-7 text-white/40" />
+   400→                    المستودعات
+   401→                  </h2>
+   402→                  <p className="text-white/40 text-sm mt-1">أحدث المشاريع والمستودعات</p>
+   403→                </div>
+   404→                {repos.length > 6 && (
+   405→                  <Button
+   406→                    variant="ghost"
+   407→                    size="sm"
+   408→                    onClick={() => setReposExpanded(!reposExpanded)}
+   409→                    className="text-white/60 hover:text-white hover:bg-white/5"
+   410→                  >
+   411→                    {reposExpanded ? (
+   412→                      <>
+   413→                        <ChevronUp className="w-4 h-4 mr-1" />
+   414→                        عرض أقل
+   415→                      </>
+   416→                    ) : (
+   417→                      <>
+   418→                        <ChevronDown className="w-4 h-4 mr-1" />
+   419→                        عرض الكل ({repos.length})
+   420→                      </>
+   421→                    )}
+   422→                  </Button>
+   423→                )}
+   424→              </div>
+   425→
+   426→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   427→                {loading
+   428→                  ? Array.from({ length: 6 }).map((_, i) => (
+   429→                      <Card key={i} className="bg-white/[0.03] border-white/10">
+   430→                        <CardContent className="p-5">
+   431→                          <Skeleton className="h-5 w-32 bg-white/10 mb-3" />
+   432→                          <Skeleton className="h-4 w-full bg-white/10 mb-2" />
+   433→                          <Skeleton className="h-4 w-24 bg-white/10" />
+   434→                        </CardContent>
+   435→                      </Card>
+   436→                    ))
+   437→                  : displayRepos.map((repo, i) => (
+   438→                      <motion.div
+   439→                        key={repo.name}
+   440→                        initial={{ opacity: 0, y: 20 }}
+   441→                        whileInView={{ opacity: 1, y: 0 }}
+   442→                        viewport={{ once: true }}
+   443→                        transition={{ delay: i * 0.05, duration: 0.4 }}
+   444→                      >
+   445→                        <Card className="bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-300 group cursor-pointer h-full">
+   446→                          <CardContent className="p-5">
+   447→                            <div className="flex items-start justify-between mb-3">
+   448→                              <div className="flex items-center gap-2 min-w-0">
+   449→                                <BookOpen className="w-4 h-4 text-white/30 flex-shrink-0" />
+   450→                                <h3 className="font-semibold text-sm truncate group-hover:text-white/90">
+   451→                                  {repo.name}
+   452→                                </h3>
+   453→                              </div>
+   454→                              <a
+   455→                                href={repo.url}
+   456→                                target="_blank"
+   457→                                rel="noopener noreferrer"
+   458→                                className="text-white/30 hover:text-white/80 transition-colors flex-shrink-0 ml-2"
+   459→                              >
+   460→                                <ExternalLink className="w-3.5 h-3.5" />
+   461→                              </a>
+   462→                            </div>
+   463→                            {repo.description && (
+   464→                              <p className="text-xs text-white/40 mb-3 line-clamp-2 leading-relaxed">
+   465→                                {repo.description}
+   466→                              </p>
+   467→                            )}
+   468→                            <div className="flex items-center gap-3 mt-auto">
+   469→                              {repo.language && (
+   470→                                <div className="flex items-center gap-1.5">
+   471→                                  <span
+   472→                                    className="w-2.5 h-2.5 rounded-full"
+   473→                                    style={{ backgroundColor: repo.color || '#8b8b8b' }}
+   474→                                  />
+   475→                                  <span className="text-xs text-white/50">{repo.language}</span>
+   476→                                </div>
+   477→                              )}
+   478→                              {repo.stars > 0 && (
+   479→                                <div className="flex items-center gap-1 text-white/40">
+   480→                                  <Star className="w-3 h-3" />
+   481→                                  <span className="text-xs">{repo.stars}</span>
+   482→                                </div>
+   483→                              )}
+   484→                              {repo.forks > 0 && (
+   485→                                <div className="flex items-center gap-1 text-white/40">
+   486→                                  <GitFork className="w-3 h-3" />
+   487→                                  <span className="text-xs">{repo.forks}</span>
+   488→                                </div>
+   489→                              )}
+   490→                            </div>
+   491→                          </CardContent>
+   492→                        </Card>
+   493→                      </motion.div>
+   494→                    ))}
+   495→              </div>
+   496→            </motion.div>
+   497→          </section>
+   498→
+   499→          {/* Comments Section */}
+   500→          <section className="mb-20">
+   501→            <motion.div
+   502→              initial={{ opacity: 0, y: 20 }}
+   503→              whileInView={{ opacity: 1, y: 0 }}
+   504→              viewport={{ once: true }}
+   505→              transition={{ duration: 0.5 }}
+   506→            >
+   507→              <div className="flex items-center justify-between mb-8">
+   508→                <div>
+   509→                  <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+   510→                    <MessageSquare className="w-7 h-7 text-white/40" />
+   511→                    التعليقات
+   512→                  </h2>
+   513→                  <p className="text-white/40 text-sm mt-1">شاركنا رأيك • يمكنك التعليق كل 6 ساعات</p>
+   514→                </div>
+   515→                <Badge variant="secondary" className="bg-white/10 text-white/60 border-white/10">
+   516→                  {comments.length} تعليق
+   517→                </Badge>
+   518→              </div>
+   519→
+   520→              {/* Comment Input */}
+   521→              <Card className="bg-white/[0.03] border-white/10 mb-6">
+   522→                <CardContent className="p-5">
+   523→                  {status === 'authenticated' ? (
+   524→                    <div className="space-y-3">
+   525→                      <div className="flex items-center gap-2 mb-2">
+   526→                        <Avatar className="w-6 h-6 border border-white/20">
+   527→                          <AvatarImage src={session?.user?.image || undefined} />
+   528→                          <AvatarFallback className="bg-white/10 text-white text-[10px]">
+   529→                            <User className="w-3 h-3" />
+   530→                          </AvatarFallback>
+   531→                        </Avatar>
+   532→                        <span className="text-xs text-white/50">
+   533→                          معلّق كـ {session?.user?.name || 'User'}
+   534→                        </span>
+   535→                      </div>
+   536→                      <Textarea
+   537→                        value={newComment}
+   538→                        onChange={(e) => setNewComment(e.target.value)}
+   539→                        placeholder="اكتب تعليقك هنا..."
+   540→                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none min-h-[80px] focus:border-white/30 focus:ring-white/20"
+   541→                        maxLength={500}
+   542→                      />
+   543→                      <div className="flex items-center justify-between">
+   544→                        <div className="flex items-center gap-2">
+   545→                          {cooldownInfo?.active && (
+   546→                            <div className="flex items-center gap-1 text-xs text-yellow-500/80">
+   547→                              <Clock className="w-3 h-3" />
+   548→                              <span>يمكنك التعليق بعد {cooldownInfo.remaining}</span>
+   549→                            </div>
+   550→                          )}
+   551→                          <span className="text-xs text-white/30">{newComment.length}/500</span>
+   552→                        </div>
+   553→                        <Button
+   554→                          onClick={handleSubmitComment}
+   555→                          disabled={sending || !newComment.trim()}
+   556→                          size="sm"
+   557→                          className="bg-white text-black hover:bg-white/90 font-medium"
+   558→                        >
+   559→                          {sending ? (
+   560→                            <Loader2 className="w-4 h-4 animate-spin" />
+   561→                          ) : (
+   562→                            <Send className="w-4 h-4 mr-2" />
+   563→                          )}
+   564→                          إرسال
+   565→                        </Button>
+   566→                      </div>
+   567→                      {error && (
+   568→                        <div className="flex items-center gap-2 text-xs text-red-400">
+   569→                          <AlertCircle className="w-3 h-3" />
+   570→                          <span>{error}</span>
+   571→                        </div>
+   572→                      )}
+   573→                    </div>
+   574→                  ) : (
+   575→                    <div className="text-center py-6">
+   576→                      <p className="text-white/40 text-sm mb-4">سجّل دخولك عبر ديسكورد لتتمكن من التعليق</p>
+   577→                      <Button onClick={signInDiscord} className="bg-white text-black hover:bg-white/90 font-medium">
+   578→                        <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+   579→                          <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286z" />
+   580→                        </svg>
+   581→                        تسجيل الدخول عبر ديسكورد
+   582→                      </Button>
+   583→                    </div>
+   584→                  )}
+   585→                </CardContent>
+   586→              </Card>
+   587→
+   588→              {/* Comments List */}
+   589→              <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+   590→                <AnimatePresence mode="popLayout">
+   591→                  {comments.length === 0 ? (
+   592→                    <motion.div
+   593→                      initial={{ opacity: 0 }}
+   594→                      animate={{ opacity: 1 }}
+   595→                      className="text-center py-12"
+   596→                    >
+   597→                      <MessageSquare className="w-10 h-10 text-white/10 mx-auto mb-3" />
+   598→                      <p className="text-white/30 text-sm">لا توجد تعليقات بعد. كن أول من يعلّق!</p>
+   599→                    </motion.div>
+   600→                  ) : (
+   601→                    comments.map((comment, i) => (
+   602→                      <motion.div
+   603→                        key={comment.id}
+   604→                        initial={{ opacity: 0, y: 10 }}
+   605→                        animate={{ opacity: 1, y: 0 }}
+   606→                        exit={{ opacity: 0, y: -10 }}
+   607→                        transition={{ delay: i * 0.03, duration: 0.3 }}
+   608→                      >
+   609→                        <Card className="bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+   610→                          <CardContent className="p-4">
+   611→                            <div className="flex items-start gap-3">
+   612→                              <Avatar className="w-8 h-8 border border-white/10 flex-shrink-0">
+   613→                                <AvatarImage src={comment.avatar || undefined} />
+   614→                                <AvatarFallback className="bg-white/10 text-white text-xs">
+   615→                                  {comment.username.charAt(0).toUpperCase()}
+   616→                                </AvatarFallback>
+   617→                              </Avatar>
+   618→                              <div className="flex-1 min-w-0">
+   619→                                <div className="flex items-center gap-2 mb-1">
+   620→                                  <span className="text-sm font-medium text-white/80">
+   621→                                    {comment.username}
+   622→                                    {comment.discriminator && comment.discriminator !== '0' && (
+   623→                                      <span className="text-white/30">#{comment.discriminator}</span>
+   624→                                    )}
+   625→                                  </span>
+   626→                                  <span className="text-[11px] text-white/25">{timeAgo(comment.createdAt)}</span>
+   627→                                </div>
+   628→                                <p className="text-sm text-white/60 leading-relaxed break-words">
+   629→                                  {comment.content}
+   630→                                </p>
+   631→                              </div>
+   632→                            </div>
+   633→                          </CardContent>
+   634→                        </Card>
+   635→                      </motion.div>
+   636→                    ))
+   637→                  )}
+   638→                </AnimatePresence>
+   639→              </div>
+   640→            </motion.div>
+   641→          </section>
+   642→        </div>
+   643→      </main>
+   644→
+   645→      {/* Footer */}
+   646→      <footer className="border-t border-white/10 bg-black/50 backdrop-blur-md mt-auto">
+   647→        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+   648→          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+   649→            <div className="flex items-center gap-2 text-white/30 text-sm">
+   650→              <Terminal className="w-4 h-4" />
+   651→              <span>© {new Date().getFullYear()} MJHOL — 6p99</span>
+   652→            </div>
+   653→            <div className="flex items-center gap-4 text-white/30 text-xs">
+   654→              <div className="flex items-center gap-1">
+   655→                <Shield className="w-3 h-3" />
+   656→                <span>محمي</span>
+   657→              </div>
+   658→              <div className="flex items-center gap-1">
+   659→                <Lock className="w-3 h-3" />
+   660→                <span>مشفر</span>
+   661→              </div>
+   662→              <div className="flex items-center gap-1">
+   663→                <Eye className="w-3 h-3" />
+   664→                <span>مراقب</span>
+   665→              </div>
+   666→            </div>
+   667→          </div>
+   668→        </div>
+   669→      </footer>
+   670→
+   671→      {/* Security Info Dialog */}
+   672→      <Dialog open={showSecurityDialog} onOpenChange={setShowSecurityDialog}>
+   673→        <DialogContent className="bg-black border-white/10 text-white max-w-md">
+   674→          <DialogHeader>
+   675→            <DialogTitle className="flex items-center gap-2">
+   676→              <Shield className="w-5 h-5 text-white/60" />
+   677→              معلومات الحماية
+   678→            </DialogTitle>
+   679→            <DialogDescription className="text-white/40">
+   680→              طبقات الحماية المطبّقة على الموقع
+   681→            </DialogDescription>
+   682→          </DialogHeader>
+   683→          <div className="space-y-4 mt-4">
+   684→            <SecurityFeature
+   685→              icon={<Lock className="w-4 h-4" />}
+   686→              title="تشفير HTTPS"
+   687→              description="جميع البيانات مشفرة عبر SSL/TLS"
+   688→            />
+   689→            <SecurityFeature
+   690→              icon={<Eye className="w-4 h-4" />}
+   691→              title="CSP Headers"
+   692→              description="Content Security Policy لحماية من XSS"
+   693→            />
+   694→            <SecurityFeature
+   695→              icon={<Shield className="w-4 h-4" />}
+   696→              title="Rate Limiting"
+   697→              description="تقييد الطلبات لمنع الإساءة (6 ساعات للتعليقات)"
+   698→            />
+   699→            <SecurityFeature
+   700→              icon={<Lock className="w-4 h-4" />}
+   701→              title="HttpOnly Cookies"
+   702→              description="حماية ملفات تعريف الارتباط من الوصول"
+   703→            />
+   704→            <SecurityFeature
+   705→              icon={<Eye className="w-4 h-4" />}
+   706→              title="XSS Protection"
+   707→              description="فلترة وتنقية جميع المدخلات"
+   708→            />
+   709→            <SecurityFeature
+   710→              icon={<Shield className="w-4 h-4" />}
+   711→              title="CSRF Protection"
+   712→              description="حماية من طلبات التزوير"
+   713→            />
+   714→            <SecurityFeature
+   715→              icon={<Lock className="w-4 h-4" />}
+   716→              title="IP Hashing"
+   717→              description="تجزئة عناوين IP لحماية الخصوصية"
+   718→            />
+   719→            <SecurityFeature
+   720→              icon={<Eye className="w-4 h-4" />}
+   721→              title="Input Sanitization"
+   722→              description="تنقية المدخلات من الأكواد الخبيثة"
+   723→            />
+   724→          </div>
+   725→        </DialogContent>
+   726→      </Dialog>
+   727→    </div>
+   728→  );
+   729→}
+   730→
+   731→// ==================== Sub-Components ====================
+   732→
+   733→function StatBadge({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+   734→  return (
+   735→    <div className="flex flex-col items-center gap-1">
+   736→      <div className="flex items-center gap-1.5 text-white/40">
+   737→        {icon}
+   738→        <span className="text-xl sm:text-2xl font-bold text-white/80">{value}</span>
+   739→      </div>
+   740→      <span className="text-[11px] text-white/30">{label}</span>
+   741→    </div>
+   742→  );
+   743→}
+   744→
+   745→function SecurityFeature({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+   746→  return (
+   747→    <div className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+   748→      <div className="text-white/40 mt-0.5">{icon}</div>
+   749→      <div>
+   750→        <p className="text-sm font-medium text-white/80">{title}</p>
+   751→        <p className="text-xs text-white/40 mt-0.5">{description}</p>
+   752→      </div>
+   753→    </div>
+   754→  );
+   755→}
+   756→
+   757→function GridOverlay() {
+   758→  return (
+   759→    <svg className="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
+   760→      <defs>
+   761→        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+   762→          <path d="M 50 0 L 0 0 0 50" fill="none" stroke="white" strokeWidth="0.5" />
+   763→        </pattern>
+   764→      </defs>
+   765→      <rect width="100%" height="100%" fill="url(#grid)" />
+   766→    </svg>
+   767→  );
+   768→}
+   769→
+   770→export default AppContent;
+   771→
