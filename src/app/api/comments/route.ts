@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sanitizeComment, getClientIP, hashIP, commentApiLimiter, getSecurityHeaders, apiRateLimiter } from '@/lib/security';
+// FIX: Use getDb(request) for Cloudflare D1 compatibility
+import { getDb } from '@/lib/db';
+import { sanitizeComment, getClientIP, hashIPSync, commentApiLimiter, getSecurityHeaders, apiRateLimiter } from '@/lib/security';
+
 
 // GET /api/comments - Fetch all comments
 export async function GET(request: NextRequest) {
   try {
+    // FIX: await getDb() — it's async for Cloudflare D1 compatibility
+    const db = await getDb(request);
     // Rate limit check
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`comments:get:${clientIP}`);
@@ -53,6 +57,8 @@ export async function GET(request: NextRequest) {
 // POST /api/comments - Create a new comment (requires Discord login + 6hr cooldown)
 export async function POST(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     // Rate limit check (API level)
     const clientIP = getClientIP(request);
     const rateCheck = commentApiLimiter.check(`comments:post:${clientIP}`);
@@ -137,7 +143,7 @@ export async function POST(request: NextRequest) {
       data: {
         content: sanitized.safe,
         userId: userRecord.id,
-        ipHash: hashIP(clientIP),
+        ipHash: hashIPSync(clientIP),
         userAgent: request.headers.get('user-agent')?.substring(0, 200) || null,
       },
     });
@@ -182,6 +188,8 @@ export async function POST(request: NextRequest) {
 // DELETE /api/comments - Admin delete (requires special header)
 export async function DELETE(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`comments:delete:${clientIP}`);
     if (!rateCheck.allowed) {

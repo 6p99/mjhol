@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+// FIX: Use getDb(request) for Cloudflare D1 compatibility
+import { getDb } from '@/lib/db';
 import { getSecurityHeaders } from '@/lib/security';
+
 
 // POST /api/auth/save - Save Discord user to database
 export async function POST(request: NextRequest) {
   try {
+    // FIX: await getDb() — it's async for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const body = await request.json();
     const { discordId, username, discriminator, avatar, email, accessToken, refreshToken } = body;
 

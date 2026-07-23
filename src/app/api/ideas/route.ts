@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+// FIX: Use getDb(request) for Cloudflare D1 compatibility
+import { getDb } from '@/lib/db';
 import { getSecurityHeaders, getClientIP, apiRateLimiter, sanitizeInput } from '@/lib/security';
+
 
 export async function GET(request: NextRequest) {
   try {
+    // FIX: await getDb() — it's async for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`ideas:get:${clientIP}`);
     if (!rateCheck.allowed) {
@@ -24,6 +28,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`ideas:post:${clientIP}`);
     if (!rateCheck.allowed) {
@@ -67,6 +73,8 @@ export async function POST(request: NextRequest) {
 // Vote on idea (supports both PATCH and PUT)
 export async function PATCH(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`ideas:vote:${clientIP}`);
     if (!rateCheck.allowed) {

@@ -1,0 +1,11 @@
+name = "mjh0l-profile"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mjh0l-profile-db"
+database_id = "PLACEHOLDER_CHANGE_ME"
+
+# FIX: Cloudflare Workers needs explicit pages config for Next.js
+[vars]
+NODE_ENV = "production"

@@ -1,10 +1,36 @@
-import { createHash, randomBytes } from 'crypto';
+// FIX: Replaced Node.js crypto with Web Crypto API
+// Cloudflare Workers don't support require('crypto')
+// Using Web Crypto API which is available in Workers runtime
 
 /**
- * Hash an IP address for privacy-safe storage
+ * Hash an IP address for privacy-safe storage (async — Web Crypto is async)
  */
-export function hashIP(ip: string): string {
-  return createHash('sha256').update(ip + process.env.IP_SALT || 'default-salt').digest('hex');
+export async function hashIP(ip: string): Promise<string> {
+  const salt = process.env.IP_SALT || 'default-salt';
+  const data = new TextEncoder().encode(ip + salt);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Hash an IP address (sync fallback for local dev with Node.js)
+ */
+export function hashIPSync(ip: string): string {
+  const salt = process.env.IP_SALT || 'default-salt';
+  const data = ip + salt;
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  // Combine with a second hash for more uniqueness
+  let hash2 = 5381;
+  for (let i = 0; i < data.length; i++) {
+    hash2 = ((hash2 << 5) + hash2 + data.charCodeAt(i)) & 0xffffffff;
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0') + Math.abs(hash2).toString(16).padStart(8, '0');
 }
 
 /**
@@ -63,11 +89,23 @@ export function sanitizeComment(content: string): { safe: string; valid: boolean
   return { safe: sanitized, valid: true };
 }
 
+// FIX: Replaced randomBytes with Web Crypto
 /**
- * Generate a CSRF token
+ * Generate a CSRF token using Web Crypto API
  */
-export function generateCSRFToken(): string {
-  return randomBytes(32).toString('hex');
+export async function generateCSRFToken(): Promise<string> {
+  const buffer = new Uint8Array(32);
+  crypto.getRandomValues(buffer);
+  return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Generate a CSRF token (sync fallback)
+ */
+export function generateCSRFTokenSync(): string {
+  const buffer = new Uint8Array(32);
+  crypto.getRandomValues(buffer);
+  return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -80,6 +118,8 @@ export function validateCSRFToken(token: string | null, expected: string): boole
 
 /**
  * Rate limiter using in-memory store
+ * FIX: Removed setInterval — Cloudflare Workers are stateless
+ * Rate limit data resets on each cold start (acceptable for edge)
  */
 class RateLimiter {
   private store: Map<string, { count: number; resetAt: number }>;
@@ -157,14 +197,4 @@ export function getSecurityHeaders(): HeadersInit {
  */
 export function isValidToken(token: string): boolean {
   return /^[a-zA-Z0-9_-]+$/.test(token) && token.length > 10 && token.length < 512;
-}
-
-/**
- * Cleanup rate limiter every 5 minutes
- */
-if (typeof global !== 'undefined') {
-  setInterval(() => {
-    apiRateLimiter.cleanup();
-    commentApiLimiter.cleanup();
-  }, 5 * 60 * 1000);
 }

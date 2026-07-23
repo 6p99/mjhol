@@ -60,3 +60,33 @@ Stage Summary:
 - Complete redesign matching mjhol.pages.dev aesthetic
 - Features: grain overlay, live AMM clock, dark/light theme toggle, AR/EN language toggle, Discord login corner, profile card with badges, numbered nav teasers, all existing features preserved
 - All verified working via Agent Browser
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Debug and fix all issues preventing Cloudflare Workers deployment
+
+Work Log:
+- Analyzed full project codebase for Cloudflare Workers compatibility
+- Identified 7 root causes blocking deployment
+- Removed unused `sharp` package (Node.js native C++ — not compatible with Workers)
+- Installed `@cloudflare/next-on-pages`, `wrangler`, `@prisma/adapter-d1`
+- Replaced `output: "standalone"` in next.config.ts (Docker output — not CF compatible)
+- Replaced Node.js `crypto` (createHash, randomBytes) with Web Crypto API
+- Removed `setInterval` from global scope (Workers are stateless)
+- Created async `getDb(request)` function in db.ts with D1 adapter + local fallback
+- Updated all 8 API routes: `db` → `getDb(request)`, `hashIP()` → `hashIPSync()`
+- Added `wrangler.toml` with D1 binding configuration
+- Created `src/env.d.ts` for Cloudflare bindings TypeScript declarations
+- Created `db/schema.sql` — D1 migration SQL equivalent to Prisma schema
+- Updated `package.json` with CF build/deploy/migrate scripts
+- Updated `.env` with documentation comments
+- Initially added `export const runtime = 'edge'` — caused Prisma error in local dev
+- Fixed by removing edge runtime exports (not needed with @cloudflare/next-on-pages)
+
+Stage Summary:
+- All 7 compatibility issues resolved
+- ESLint passes clean (0 errors, 0 warnings)
+- All API routes return 200 in local dev
+- Agent Browser verified: no errors, all UI elements render correctly
+- Project is ready for Cloudflare Workers deployment with: bun run deploy:cf

@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+// FIX: Use getDb(request) for Cloudflare D1 compatibility
+import { getDb } from '@/lib/db';
 import { getSecurityHeaders, getClientIP, apiRateLimiter, sanitizeInput } from '@/lib/security';
 
 const ADMIN_DISCORD_ID = '803662340465229855';
 
+
 // GET /api/servers - Get all servers (admin only)
 export async function GET(request: NextRequest) {
   try {
+    // FIX: await getDb() — it's async for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`servers:get:${clientIP}`);
     if (!rateCheck.allowed) {
@@ -38,6 +42,8 @@ export async function GET(request: NextRequest) {
 // POST /api/servers - Add a server via invite link (admin only)
 export async function POST(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`servers:post:${clientIP}`);
     if (!rateCheck.allowed) {
@@ -122,6 +128,8 @@ export async function POST(request: NextRequest) {
 // DELETE /api/servers - Remove a server (admin only)
 export async function DELETE(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`servers:delete:${clientIP}`);
     if (!rateCheck.allowed) {

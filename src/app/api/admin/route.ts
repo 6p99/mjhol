@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+// FIX: Use getDb(request) for Cloudflare D1 compatibility
+import { getDb } from '@/lib/db';
 import { getSecurityHeaders, getClientIP, apiRateLimiter } from '@/lib/security';
 
 const ADMIN_DISCORD_ID = '803662340465229855';
@@ -16,9 +17,12 @@ async function checkAdmin(request: NextRequest) {
   return true;
 }
 
+
 // GET /api/admin - Full admin dashboard data
 export async function GET(request: NextRequest) {
   try {
+    // FIX: await getDb() — it's async for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`admin:get:${clientIP}`);
     if (!rateCheck.allowed) {
@@ -75,6 +79,8 @@ export async function GET(request: NextRequest) {
 // DELETE /api/admin - Delete comment or user
 export async function DELETE(request: NextRequest) {
   try {
+    // FIX: Use getDb(request) for Cloudflare D1 compatibility
+    const db = await getDb(request);
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`admin:delete:${clientIP}`);
     if (!rateCheck.allowed) {
