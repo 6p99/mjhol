@@ -63,6 +63,14 @@ model VisitorCount {
   count Int    @default(0)
 }
 
+model Visitor {
+  id        String   @id @default(cuid())
+  fingerprint String @unique // browser fingerprint (ip + user agent hash)
+  ipHash    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
 model Idea {
   id        String   @id @default(cuid())
   title     String
@@ -73,6 +81,14 @@ model Idea {
   status    String   @default("pending") // pending, approved, rejected
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model IdeaSubmission {
+  id        String   @id @default(cuid())
+  fingerprint String // who submitted
+  ipHash    String?
+  ideaId    String   // the idea they submitted
+  createdAt DateTime @default(now())
 }
 
 model ServiceStatus {
