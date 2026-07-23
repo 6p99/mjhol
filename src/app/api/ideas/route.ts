@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
     }
 
     const ideas = await db.idea.findMany({
-      where: { status: 'approved' },
       orderBy: [{ votes: 'desc' }, { createdAt: 'desc' }],
       take: 50,
     });
@@ -54,7 +53,7 @@ export async function POST(request: NextRequest) {
         content: cleanContent,
         userId: session?.user?.id || null,
         ipHash: clientIP,
-        status: 'pending',
+        status: 'approved',
       },
     });
 
@@ -65,8 +64,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Vote on idea
-export async function PUT(request: NextRequest) {
+// Vote on idea (supports both PATCH and PUT)
+export async function PATCH(request: NextRequest) {
   try {
     const clientIP = getClientIP(request);
     const rateCheck = apiRateLimiter.check(`ideas:vote:${clientIP}`);
@@ -74,14 +73,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
 
-    const { ideaId, type } = await request.json();
-    if (!ideaId || !['upvote', 'downvote'].includes(type)) {
+    const { id, dir } = await request.json();
+    if (!id || !['up', 'down'].includes(dir)) {
       return NextResponse.json({ error: 'Invalid' }, { status: 400 });
     }
 
     const idea = await db.idea.update({
-      where: { id: ideaId },
-      data: { votes: { increment: type === 'upvote' ? 1 : -1 } },
+      where: { id },
+      data: { votes: { increment: dir === 'up' ? 1 : -1 } },
     });
 
     return NextResponse.json({ votes: idea.votes }, { headers: getSecurityHeaders() });
@@ -89,4 +88,8 @@ export async function PUT(request: NextRequest) {
     console.error('Vote error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
+}
+
+export async function PUT(request: NextRequest) {
+  return PATCH(request);
 }

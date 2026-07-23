@@ -1,0 +1,33 @@
+{
+  "code": 200,
+  "data": {
+    "description": "MJ (6p99) — identity, stack, and tools.",
+    "external": {
+      "preconnect": {
+        "https://fonts.googleapis.com/": {},
+        "https://fonts.gstatic.com/": {
+          "crossorigin": ""
+        }
+      }
+    },
+    "html": "<html lang=\"en\" dir=\"ltr\" data-lang=\"en\"><head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>about — 6p99</title>\n<meta name=\"description\" content=\"MJ (6p99) — identity, stack, and tools.\">\n<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin=\"\">\n<link href=\"https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap\" rel=\"stylesheet\">\n<link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body data-page=\"about\">\n<div id=\"authBox\" class=\"auth-corner ltr\"></div>\n<div class=\"grain\"></div>\n\n<div class=\"statusbar\">\n  <div class=\"statusbar-inner\">\n    <a class=\"sb-session\" href=\"index.html\">6p</a>\n    <nav class=\"sb-tabs\">\n      <a class=\"sb-tab\" data-page=\"home\" href=\"index.html\"><span data-i18n=\"nav.home\">home</span></a>\n      <a class=\"sb-tab\" data-page=\"about\" href=\"about.html\"><span data-i18n=\"nav.about\">about</span></a>\n      <a class=\"sb-tab\" data-page=\"projects\" href=\"projects.html\"><span data-i18n=\"nav.projects\">projects</span></a>\n      <a class=\"sb-tab\" data-page=\"servers\" href=\"servers.html\"><span data-i18n=\"nav.servers\">servers</span></a>\n      <a class=\"sb-tab\" data-page=\"blog\" href=\"blog.html\"><span data-i18n=\"nav.blog\">blog</span></a>\n      <a class=\"sb-tab\" data-page=\"guestbook\" href=\"guestbook.html\"><span data-i18n=\"nav.guestbook\">guestbook</span></a>\n    </nav>\n    <div class=\"sb-right\">\n      <div class=\"sb-clock\" id=\"clock\">19:57 AMM</div>\n      <a class=\"design-switch\" href=\"ghost/about.html\">bento</a>\n      <button id=\"themeToggle\" type=\"button\">light</button>\n      <button id=\"langToggle\" type=\"button\">AR</button>\n    </div>\n  </div>\n</div>\n\n<main>\n  <section class=\"pane\">\n    <div class=\"wrap reveal\">\n      <h1 class=\"page-title\" data-i18n=\"about.title\">about</h1>\n      <div class=\"card\">\n        <pre class=\"code\" id=\"identityBox\">pulling from GitHub…</pre>\n      </div>\n\n      <div class=\"card\">\n        <h2 class=\"card-title\" data-i18n=\"section.stack.title\">stack</h2>\n        <div class=\"marquee-wrap ltr\">\n          <div class=\"marquee-row\">\n            <div class=\"marquee-track dir-ltr\">\n              <span class=\"lang-chip\">Python</span><span class=\"lang-chip\">JavaScript</span><span class=\"lang-chip\">Java</span><span class=\"lang-chip\">C#</span><span class=\"lang-chip\">TypeScript</span><span class=\"lang-chip\">C++</span><span class=\"lang-chip\">C</span><span class=\"lang-chip\">PHP</span>\n              <span class=\"lang-chip\">Python</span><span class=\"lang-chip\">JavaScript</span><span class=\"lang-chip\">Java</span><span class=\"lang-chip\">C#</span><span class=\"lang-chip\">TypeScript</span><span class=\"lang-chip\">C++</span><span class=\"lang-chip\">C</span><span class=\"lang-chip\">PHP</span>\n            </div>\n          </div>\n          <div class=\"marquee-row\">\n            <div class=\"marquee-track dir-rtl\">\n              <span class=\"lang-chip\">Go</span><span class=\"lang-chip\">Swift</span><span class=\"lang-chip\">Kotlin</span><span class=\"lang-chip\">SQL</span><span class=\"lang-chip\">Rust</span><span class=\"lang-chip\">Ruby</span><span class=\"lang-chip\">R</span>\n              <span class=\"lang-chip\">Go</span><span class=\"lang-chip\">Swift</span><span class=\"lang-chip\">Kotlin</span><span class=\"lang-chip\">SQL</span><span class=\"lang-chip\">Rust</span><span class=\"lang-chip\">Ruby</span><span class=\"lang-chip\">R</span>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <div class=\"card\">\n        <h2 class=\"card-title\" data-i18n=\"contact.title\">contact</h2>\n        <div class=\"connections ltr\">\n          <a class=\"connection\" href=\"https://github.com/6p99\" target=\"_blank\" rel=\"noopener\">\n            <div class=\"con-icon\">GH</div>\n            <div class=\"con-text\"><span class=\"con-name\">GitHub</span><span class=\"con-meta\">6p99</span></div>\n          </a>\n          <div class=\"connection\">\n            <div class=\"con-icon\">DC</div>\n            <div class=\"con-text\"><span class=\"con-name\">Discord</span><span class=\"con-meta\">6p_9</span></div>\n          </div>\n        </div>\n      </div>\n    </div>\n  </section>\n</main>\n\n<footer class=\"ltr\">\n  <div class=\"footer-links\">\n    <a href=\"https://github.com/6p99\" target=\"_blank\" rel=\"noopener\">GitHub</a>\n    <a href=\"https://discord.gg/lanyard\" target=\"_blank\" rel=\"noopener\">Discord</a>\n  </div>\n  <div class=\"ltr\" style=\"margin-top:10px; font-size:11px; color:var(--dimmer);\">\n    <span id=\"visitCount\">—</span> <span data-i18n=\"visits.label\">visits</span>\n  </div>\n</footer>\n\n<script src=\"script.js\"></script>\n\n\n</body></html>",
+    "httpStatus": 200,
+    "httpStatusText": "OK",
+    "metadata": {
+      "description": "MJ (6p99) — identity, stack, and tools.",
+      "lang": "en",
+      "viewport": "width=device-width, initial-scale=1.0"
+    },
+    "title": "about — 6p99",
+    "url": "https://mjhol.pages.dev/about.html",
+    "usage": {
+      "tokens": 1413
+    }
+  },
+  "meta": {
+    "usage": {
+      "tokens": 1413
+    }
+  },
+  "status": 20000
+}

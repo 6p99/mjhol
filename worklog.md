@@ -31,3 +31,32 @@ Stage Summary:
 - Comment system with 6-hour cooldown per user
 - 8 security layers implemented
 - All verified working in browser
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Redesign site to match mjhol.pages.dev reference features
+
+Work Log:
+- Read and analyzed https://mjhol.pages.dev/ and all its subpages (home, about, projects, servers, blog, guestbook)
+- Extracted design patterns: Discord-like profile card, grain overlay, sticky statusbar, live clock, theme toggle, language toggle, navigation teasers
+- Completely rewrote src/app/page.tsx with new design matching reference site:
+  - Sticky statusbar with logo, nav tabs, clock (AMM timezone), theme toggle, language toggle, music toggle
+  - Discord-like profile card with banner, avatar + status dot, badges (M,J,H,O,L), about section, connections
+  - Navigation teasers grid (01-06 numbered cards)
+  - All views: home, projects, servers, blog, guestbook, status, ideas, admin
+  - Auth corner (Discord login/logout)
+  - Grain/noise overlay effect
+  - Reveal animations with useInView
+  - View transitions with AnimatePresence
+- Updated globals.css with grain overlay CSS, nav-tabs mask, font fallbacks
+- Updated layout.tsx with JetBrains Mono via next/font/google, proper metadata
+- Fixed ideas API: added PATCH method for voting, removed status filter so new ideas show immediately
+- All API routes verified working (200 responses)
+- ESLint passes clean
+- Agent Browser verified: all views render, theme toggle works, language toggle works, navigation works, no console errors
+
+Stage Summary:
+- Complete redesign matching mjhol.pages.dev aesthetic
+- Features: grain overlay, live AMM clock, dark/light theme toggle, AR/EN language toggle, Discord login corner, profile card with badges, numbered nav teasers, all existing features preserved
+- All verified working via Agent Browser
