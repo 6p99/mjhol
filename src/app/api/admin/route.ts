@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 // FIX: Use getDb(request) for Cloudflare D1 compatibility
 import { getDb } from '@/lib/db';
@@ -113,3 +114,4 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
   }
 }
+

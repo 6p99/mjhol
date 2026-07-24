@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSecurityHeaders, getClientIP, apiRateLimiter, sanitizeInput } from '@/lib/security';
@@ -149,3 +150,4 @@ export async function PATCH(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   return PATCH(request);
 }
+

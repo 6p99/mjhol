@@ -1,11 +1,11 @@
-name = "mjh0l-profile"
+name = "mjhol"
 compatibility_date = "2025-01-01"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "mjh0l-profile-db"
-database_id = "PLACEHOLDER_CHANGE_ME"
+database_id = "4b1b1a4f-aeaa-43bb-9462-5b35af7bb75b"
 
-# FIX: Cloudflare Workers needs explicit pages config for Next.js
 [vars]
 NODE_ENV = "production"
+NEXTAUTH_URL = "https://mjhol.pages.dev"
