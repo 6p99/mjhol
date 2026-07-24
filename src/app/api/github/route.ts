@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 
 // GitHub profile data - cached on server side
@@ -41,3 +42,4 @@ export async function GET() {
     })),
   });
 }
+

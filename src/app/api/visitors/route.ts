@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSecurityHeaders, getClientIP, apiRateLimiter } from '@/lib/security';
@@ -74,3 +75,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
